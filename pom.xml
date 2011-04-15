@@ -19,8 +19,20 @@
     <module>harness</module>
   </modules>
 
+  <repositories>
+    <repository>
+      <id>file-based-repo-for-external-libs</id>
+      <url>file://${basedir}/lib</url>
+    </repository>
+  </repositories>
+
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>chiba</groupId>
+        <artifactId>chiba</artifactId>
+        <version>1.1.1</version>
+      </dependency>
       <dependency>
         <groupId>com.sun</groupId>
         <artifactId>tools</artifactId>
@@ -153,6 +165,12 @@
         <configuration>
           <encoding>UTF-8</encoding>
         </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>2.3</version>
       </plugin>
     </plugins>
   </build>
