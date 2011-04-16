@@ -22,4 +22,28 @@
       <scope>test</scope>
   	</dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>rmic-maven-plugin</artifactId>
+        <version>1.1</version>
+        <executions>
+          <execution>
+            <id>rmi compilation</id>
+            <goals>
+              <goal>rmic</goal>
+            </goals>
+            <configuration>
+              <includes><include>**/*Impl.class</include></includes>
+              <excludes><exclude>**/*$*.class</exclude></excludes>
+              <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+              <version>compat</version>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>
