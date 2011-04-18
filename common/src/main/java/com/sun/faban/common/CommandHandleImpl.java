@@ -72,7 +72,7 @@ public class CommandHandleImpl implements CommandHandle {
     }
 
     /**
-     * Forfully terminates the command.
+     * Forcefully terminates the command.
      */
     public void destroy() {
         command.killed = true;
@@ -204,7 +204,7 @@ public class CommandHandleImpl implements CommandHandle {
     }
 
     void processLogs() {
-        ReaderThread[] readers = (ReaderThread[]) streamReaders.get();
+        ReaderThread[] readers = streamReaders.get();
         if (readers == null) {
             readers = new ReaderThread[2];
             streamReaders.set(readers);
