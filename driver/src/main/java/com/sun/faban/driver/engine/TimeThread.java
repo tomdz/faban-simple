@@ -134,15 +134,14 @@ public class TimeThread extends AgentThread {
 
             // Save the previous operation
             previousOperation[mixId] = currentOperation;
-            BenchmarkDefinition.Operation previousOp = null;
+            Operation previousOp = null;
             if (previousOperation[mixId] >= 0) {
                 previousOp = driverConfig.operations[currentOperation];
             }
 
             // Select the operation
             currentOperation = selector[0].select();
-            BenchmarkDefinition.Operation op =
-                    driverConfig.operations[currentOperation];
+            Operation op = driverConfig.operations[currentOperation];
 
             // The invoke time is based on the delay after the previous op.
             // so we need to use previous op for calculating and recording.
@@ -155,7 +154,7 @@ public class TimeThread extends AgentThread {
                 break driverLoop;
             }
 
-            logger.finest(name + ": Invoking " + op.name + " at time " +
+            logger.finest(name + ": Invoking " + op.getName() + " at time " +
                     invokeTime + ". Ramp down ends at time " +
                     endRampDown + '.');
 
@@ -164,11 +163,11 @@ public class TimeThread extends AgentThread {
             // Invoke the operation
             try {
                 if (id == 0)
-                    logger.finest("Invoking " + op.name + " at " +
+                    logger.finest("Invoking " + op.getName() + " at " +
                             System.nanoTime());
-                op.m.invoke(driver);
+                op.getMethod().invoke(driver);
                 if (id == 0)
-                    logger.finest("Returned from " + op.name + " (OK) at " +
+                    logger.finest("Returned from " + op.getName() + " (OK) at " +
                             System.nanoTime());
                 validateTimeCompletion(op);
                 if (id == 0) {
@@ -181,7 +180,7 @@ public class TimeThread extends AgentThread {
                 metrics.recordDelayTime();
             } catch (InvocationTargetException e) {
                 if (id == 0)
-                    logger.finest("Returned from " + op.name + " (Err) at " +
+                    logger.finest("Returned from " + op.getName() + " (Err) at " +
                             System.nanoTime());
                 // An invocation target exception is caused by another
                 // exception thrown by the operation directly.
@@ -201,7 +200,7 @@ public class TimeThread extends AgentThread {
                 if (timingInfo.respondTime == TIME_NOT_SET &&
                         timingInfo.lastRespondTime != TIME_NOT_SET) {
                     logger.fine("Potential open request in operation " +
-                            op.m.getName() + ".");
+                            op.getMethod().getName() + ".");
                     timingInfo.respondTime = timingInfo.lastRespondTime;
                 }
 
@@ -237,7 +236,7 @@ public class TimeThread extends AgentThread {
                     metrics.recordDelayTime();
                 }
             } catch (IllegalAccessException e) {
-                logger.log(Level.SEVERE, name + "." + op.m.getName() +
+                logger.log(Level.SEVERE, name + "." + op.getMethod().getName() +
                         ": " + e.getMessage(), e);
                 agent.abortRun();
                 return;

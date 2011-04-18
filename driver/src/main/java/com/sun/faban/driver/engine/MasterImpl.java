@@ -1308,10 +1308,10 @@ public class MasterImpl extends UnicastRemoteObject implements Master {
 
             formatter.format("%.02f", current[type].timestamp / 1000d);
             b.append("s - ").append(benchDef.drivers[type].name).append(": ");
-            b.append(benchDef.drivers[type].operations[0].name);
+            b.append(benchDef.drivers[type].operations[0].getName());
             for (int j = 1; j < benchDef.drivers[type].operations.length; j++) {
                 b.append('/');
-                b.append(benchDef.drivers[type].operations[j].name);
+                b.append(benchDef.drivers[type].operations[j].getName());
             }
 
             for (int i = 0; i < s.length; i++) {

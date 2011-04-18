@@ -23,21 +23,36 @@
  */
 package com.sun.faban.driver.engine;
 
-import com.sun.faban.driver.*;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import com.sun.faban.driver.Background;
+import com.sun.faban.driver.BenchmarkDriver;
+import com.sun.faban.driver.BenchmarkOperation;
+import com.sun.faban.driver.ConfigurationException;
+import com.sun.faban.driver.CycleType;
+import com.sun.faban.driver.DefinitionException;
+import com.sun.faban.driver.InitialDelay;
+import com.sun.faban.driver.OnceAfter;
+import com.sun.faban.driver.OnceBefore;
+import com.sun.faban.driver.RunControl;
 
 /**
  * Implements the basic benchmark, driver, and operation definitions.
@@ -57,33 +72,32 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
     String scaleUnit;
     boolean configPrecedence;
 
-    static BenchmarkDefinition read(String defClassName)
-            throws DefinitionException, ConfigurationException {
+    static BenchmarkDefinition read(String defClassName) throws DefinitionException, ConfigurationException {
         BenchmarkDefinition def = new BenchmarkDefinition();
         String className = def.getClass().getName();
         Logger logger = Logger.getLogger(className);
-
         Class<?> defClass;
+
         try {
             defClass = Class.forName(defClassName);
-        } catch (ClassNotFoundException e) {
-            
+        }
+        catch (ClassNotFoundException e) {
             //Did not find the class in the default classloader, 
             //look first in the faban.tmpdir then in java.io.tmpdir
             //for the generated class
             String tempDir = System.getProperty("faban.tmpdir");
             
-            if(tempDir==null){
+            if (tempDir==null){
                 tempDir = System.getProperty("java.io.tmpdir");
             }
             
             File classFile = new File(tempDir);
-            
             URL url[]= new URL[1];
             
             try {
                 url[0] = classFile.toURI().toURL();
-            } catch (MalformedURLException ex) {
+            }
+            catch (MalformedURLException ex) {
                 logger.log(Level.SEVERE, "Bad file URL for generated java class!");
                 throw new ConfigurationException(ex);
             }
@@ -91,10 +105,10 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
             URLClassLoader loader = new URLClassLoader(url, BenchmarkDefinition.class.getClassLoader());
             
             try {
-                
                 defClass=loader.loadClass(defClassName);
                 
-            } catch(ClassNotFoundException cnfex) {
+            }
+            catch(ClassNotFoundException cnfex) {
                 ConfigurationException ce = new ConfigurationException(e);
                 logger.log(Level.SEVERE, e.getMessage(), ce);
                 throw ce;
@@ -103,16 +117,13 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
             
         }
 
-        if (!defClass.isAnnotationPresent(
-                com.sun.faban.driver.BenchmarkDefinition.class)) {
-            String msg = "Class " + defClassName +
-                    " is not a benchmark definition.";
+        if (!defClass.isAnnotationPresent(com.sun.faban.driver.BenchmarkDefinition.class)) {
+            String msg = "Class " + defClassName + " is not a benchmark definition.";
             logger.severe(msg);
             throw new ConfigurationException(msg);
         }
 
-        com.sun.faban.driver.BenchmarkDefinition benchDefAnnotation = defClass.
-                getAnnotation(com.sun.faban.driver.BenchmarkDefinition.class);
+        com.sun.faban.driver.BenchmarkDefinition benchDefAnnotation = defClass.getAnnotation(com.sun.faban.driver.BenchmarkDefinition.class);
 
         def.name = benchDefAnnotation.name();
         def.version = benchDefAnnotation.version();
@@ -126,15 +137,13 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
 
         // Get all the driver classes
         for (Class<?> driverClass : benchDefAnnotation.drivers()) {
-			if (driverClass != Object.class && driverClass.isAnnotationPresent(
-                    BenchmarkDriver.class)) {
+			if (driverClass != Object.class && driverClass.isAnnotationPresent(BenchmarkDriver.class)) {
 				driverClassList.add(driverClass);
 			}
 		}
 
         // If defClass is not in list and is a driver, prepend
-        if (driverClassList.indexOf(defClass) < 0 &&
-                defClass.isAnnotationPresent(BenchmarkDriver.class)) {
+        if (driverClassList.indexOf(defClass) < 0 && defClass.isAnnotationPresent(BenchmarkDriver.class)) {
 			driverClassList.add(0, defClass);
 		}
 
@@ -153,8 +162,7 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
 
         // Obtain all driver and driver class names
         for (int i = 0; i < driverClasses.length; i++) {
-            BenchmarkDriver benchDriver = driverClasses[i].getAnnotation(
-                    BenchmarkDriver.class);
+            BenchmarkDriver benchDriver = driverClasses[i].getAnnotation(BenchmarkDriver.class);
             def.drivers[i] = new Driver();
             def.drivers[i].name = benchDriver.name();
             def.drivers[i].metric = benchDriver.metric();
@@ -170,14 +178,14 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
             for (int j = 0; j < percentiles.length; j++) {
                 String percentile = percentiles[j];
                 int length = percentile.length();
-                if (percentile.endsWith("%"))
+                if (percentile.endsWith("%")) {
                     --length;
+                }
                 if (!Character.isDigit(percentile.charAt(length - 1))) {
                     String suffix = percentile.substring(length - 2, length);
-                    if (!suffix.equals("th") && !suffix.equals("st") &&
-                            !suffix.equals("nd") && !suffix.equals("rd"))
-                        throw new DefinitionException(
-                                "Invalid percentile suffix " + suffix);
+                    if (!suffix.equals("th") && !suffix.equals("st") && !suffix.equals("nd") && !suffix.equals("rd")) {
+                        throw new DefinitionException("Invalid percentile suffix %s", suffix);
+                    }
                     def.drivers[i].pctSuffix[j] = suffix;
                     length -= 2;
                 }
@@ -185,24 +193,21 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
                 def.drivers[i].pctString[j] = percentile;
 
                 try {
-                    def.drivers[i].percentiles[j] =
-                            Double.parseDouble(percentile);
-                } catch (NumberFormatException e) {
-                    throw new DefinitionException(percentile + " not a number.",
-                            e);
+                    def.drivers[i].percentiles[j] = Double.parseDouble(percentile);
+                }
+                catch (NumberFormatException e) {
+                    throw new DefinitionException(e, "%s not a number.", percentile);
                 }
 
-                if (def.drivers[i].percentiles[j] <= 0d ||
-                        def.drivers[i].percentiles[j] >= 100d) {
-                    throw new DefinitionException("Percentile " + percentile +
-                            " must be greater than 0 and less than 100.");
+                if (def.drivers[i].percentiles[j] <= 0d || def.drivers[i].percentiles[j] >= 100d) {
+                    throw new DefinitionException("Percentile %s must be greater than 0 and less than 100.", percentile);
                 }
             }
 
             def.drivers[i].responseTimeUnit = benchDriver.responseTimeUnit();
-            if (def.drivers[i].responseTimeUnit.equals(TimeUnit.NANOSECONDS))
-                throw new DefinitionException("@BenchmarkDriver " +
-                                "responseTimeUnit must not be NANOSECONDS");
+            if (def.drivers[i].responseTimeUnit.equals(TimeUnit.NANOSECONDS)) {
+                throw new DefinitionException("@BenchmarkDriver responseTimeUnit must not be NANOSECONDS");
+            }
             def.drivers[i].className = driverClasses[i].getName();
             populatePrePost(driverClasses[i], def.drivers[i]);
             getBackground(driverClasses[i], def.drivers[i]);
@@ -215,7 +220,7 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
 
             // Copy operation references into a flat array.
             def.drivers[i].operations =
-                    new BenchmarkDefinition.Operation[totalOps];
+                    new Operation[totalOps];
             System.arraycopy(def.drivers[i].mix[0].operations, 0,
                     def.drivers[i].operations, 0,
                     def.drivers[i].mix[0].operations.length);
@@ -229,33 +234,32 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
             // Check the percentile limit on each operation
             double maxPctLimit = Double.MIN_VALUE;
             for (Operation op : def.drivers[i].operations) {
-                if (op.percentileLimits.length !=
-                        def.drivers[i].percentiles.length) {
-                    throw new DefinitionException("@BenchmarkOperation " +
-                            op.name + " percentileLimits array must be the " +
-                            "same length as @BenchmarkDriver percentiles");
+                if (op.getPercentileLimits().length != def.drivers[i].percentiles.length) {
+                    throw new DefinitionException("@BenchmarkOperation %s percentileLimits array must be the same length as @BenchmarkDriver percentiles", op.getName());
                 }
-                for (double limit : op.percentileLimits) {
+                for (double limit : op.getPercentileLimits()) {
                     if (limit > 0d && limit > maxPctLimit) {
                         maxPctLimit = limit;
                     }
                 }
             }
             if (def.drivers[i].percentiles.length > 0) {
-                if (maxPctLimit <= 0d)
-                    throw new DefinitionException("At least one percentile " +
-                            "limit must be specified.");
-            } else { // Old style...
-                for (Operation op : def.drivers[i].operations)
-                    if (op.max90th > 0d && op.max90th > maxPctLimit)
-                        maxPctLimit = op.max90th;
-                 if (maxPctLimit <= 0d)
-                     throw new DefinitionException("At least one max90th " +
-                             "must be specified.");
+                if (maxPctLimit <= 0d) {
+                    throw new DefinitionException("At least one percentile limit must be specified.");
+                }
+            }
+            else { // Old style...
+                for (Operation op : def.drivers[i].operations) {
+                    if (op.getMax90th() > 0d && op.getMax90th()> maxPctLimit) {
+                        maxPctLimit = op.getMax90th();
+                    }
+                }
+                if (maxPctLimit <= 0d) {
+                    throw new DefinitionException("At least one max90th must be specified.");
+                }
             }
 
             def.drivers[i].maxPercentile = maxPctLimit;
-
             def.drivers[i].driverClass = driverClasses[i];
         }
         return def;
@@ -268,17 +272,17 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
      * @throws ConfigurationException Error in the benchmark configuration
      * @throws DefinitionException Error in the benchmark definition
      */
-    public static void printFabanDD(String defClassName)
-            throws ConfigurationException, DefinitionException {
+    public static void printFabanDD(String defClassName) throws ConfigurationException, DefinitionException {
         Logger logger = Logger.getLogger(BenchmarkDefinition.class.getName());
         logger.fine("Generating Faban DD.");
         Class<?> defClass;
         try {
             defClass = Class.forName(defClassName);
             logger.fine("Found benchmark definition class " + defClassName);
-        } catch (ClassNotFoundException e) {
+        }
+        catch (ClassNotFoundException e) {
             File runXml = new File(System.getProperty("benchmark.config"));
-            throw new ConfigurationException("Defining class " + defClassName +
+            throw new ConfigurationException("Defining class %s" + defClassName +
                                             " in " + runXml.getName() +
                                             " not found in deployment.", e);
         }
@@ -328,8 +332,7 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
         }
     }
 
-    private static void getBackground(Class<?> driverClass, Driver driver)
-            throws DefinitionException {
+    private static void getBackground(Class<?> driverClass, Driver driver) throws DefinitionException {
         if (!driverClass.isAnnotationPresent(Background.class)) {
             driver.mix[1] = null;
             driver.initialDelay[1] = null;
@@ -342,36 +345,34 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
         mix.operations = getOperationsNoCycles(driverClass, ops);
         com.sun.faban.driver.FixedTime[] timings = background.timings();
         if (timings.length == 0) { // No bg timing, use driver or method timing
-            Cycle.setCycles(mix.operations, driverClass);
-        } else if (timings.length == 1) { // Apply to all the background ops
+            setCycles(mix.operations, driverClass);
+        }
+        else if (timings.length == 1) { // Apply to all the background ops
             FixedTime fixedTime = new FixedTime();
             fixedTime.init(timings[0]);
             for (Operation op : mix.operations) {
-				op.cycle = fixedTime;
+				op.setCycle(fixedTime);
 			}
-        } else if (timings.length > 1) { // Appy timing to each background op
+        }
+        else if (timings.length > 1) { // Appy timing to each background op
             if (timings.length != mix.operations.length) {
-				throw new DefinitionException("No of background ops must " +
-                        "match the no of timings, currently " +
-                        mix.operations.length + " vs " + timings.length);
+				throw new DefinitionException("No of background ops must match the no of timings, currently %d vs %d", mix.operations.length, timings.length);
 			}
             for (int i = 0; i < timings.length; i++) {
-                if (mix.operations[i].cycle != null) {
-					throw new DefinitionException("Duplicate operations " +
-                            "entry in @Background");
+                if (mix.operations[i].getCycle() != null) {
+					throw new DefinitionException("Duplicate operations entry in @Background");
 				}
-                mix.operations[i].cycle = new FixedTime();
-                mix.operations[i].cycle.init(timings[i]);
+                Cycle cycle = new FixedTime();
+                cycle.init(timings[i]);
+                mix.operations[i].setCycle(cycle);
             }
         }
         driver.mix[1] = mix;
-        driver.initialDelay[1] =
-                getInitialDelay(background.initialDelay().max());
+        driver.initialDelay[1] = getInitialDelay(background.initialDelay().max());
     }
 
     private static Cycle getInitialDelay(Class<?> driverClass) {
-        InitialDelay initDelay = driverClass.getAnnotation(
-                InitialDelay.class);
+        InitialDelay initDelay = driverClass.getAnnotation(InitialDelay.class);
         int max;
         if (initDelay == null) {
 			max = 0;
@@ -402,71 +403,112 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
     	super();
     }
 
-    static Operation[] getOperations(Class<?> driverClass, String[] names)
-            throws DefinitionException {
+    public static Operation[] getOperations(Class<?> driverClass, String[] names) throws DefinitionException
+    {
         Operation[] ops = getOperationsNoCycles(driverClass, names);
-        Cycle.setCycles(ops, driverClass);
+        setCycles(ops, driverClass);
         return ops;
     }
 
-    private static Operation[] getOperationsNoCycles(Class<?> driverClass,
-                                                     String[] names)
-            throws DefinitionException {
-        HashMap<String, Operation> operationMap =
-                new HashMap<String, Operation>();
-
-        // First we read all the operations that have the annotation
+    private static Map<String, Operation> getOperationsInternal(Class<?> driverClass) throws DefinitionException {
+        Map<String, Operation> operations = new LinkedHashMap<String, Operation>();
         Method[] methods = driverClass.getMethods();
         for (Method m : methods) {
-			if (m.isAnnotationPresent(BenchmarkOperation.class)) {
-                BenchmarkOperation benchOp = m.getAnnotation(
-                        BenchmarkOperation.class);
-                Operation op = new Operation();
-                op.name = benchOp.name();
-                op.percentileLimits = benchOp.percentileLimits();
-                op.max90th = benchOp.max90th();
-                op.timing = benchOp.timing();
-                op.countToMetric = benchOp.countToMetric();
-                op.m = m;
-                operationMap.put(op.name, op);
+            if (m.isAnnotationPresent(BenchmarkOperation.class)) {
+                BenchmarkOperation benchOp = m.getAnnotation(BenchmarkOperation.class);
+                Operation op = new Operation(benchOp);
+                op.setMethod(m);
+                operations.put(op.getName(), op);
             }
-		}
+        }
+
+        return operations;
+    }
+
+    public static Operation[] getOperations(Class<?> driverClass) throws DefinitionException {
+        Map<String, Operation> operations = getOperationsInternal(driverClass);
+        Operation[] ops = operations.values().toArray(new Operation[operations.size()]);
+        setCycles(ops, driverClass);
+        return ops;
+    }
+
+    private static Operation[] getOperationsNoCycles(Class<?> driverClass, String[] names) throws DefinitionException {
+        Map<String, Operation> operations = getOperationsInternal(driverClass);
         Operation[] ops = new Operation[names.length];
 
         // Then we list them according to the name
         for (int i = 0; i < names.length; i++) {
-            ops[i] = operationMap.get(names[i]);
+            ops[i] = operations.get(names[i]);
             if (ops[i] == null) {
-				throw new DefinitionException("Operation \"" + names[i] +
-                        "\" listed in mix not found");
+				throw new DefinitionException("Operation \"%s\" listed in mix not found", names[i]);
 			}
         }
         return ops;
     }
 
-    static Operation[] getOperations(Class<?> driverClass)
-            throws DefinitionException {
-        ArrayList<Operation> operationList = new ArrayList<Operation>();
-        Method[] methods = driverClass.getMethods();
-        for (Method m : methods) {
-			if (m.isAnnotationPresent(BenchmarkOperation.class)) {
-                BenchmarkOperation benchOp = m.getAnnotation(
-                        BenchmarkOperation.class);
-                Operation op = new Operation();
-                op.name = benchOp.name();
-                op.percentileLimits = benchOp.percentileLimits();
-                op.max90th = benchOp.max90th();
-                op.timing = benchOp.timing();
-                op.countToMetric = benchOp.countToMetric();
-                op.m = m;
-                operationList.add(op);
-            }
-		}
+    private static void setCycles(Operation[] operations, Class<?> driverClass) throws DefinitionException
+    {
+        Cycle classCycle = null;
+        Annotation[] annotations = driverClass.getAnnotations();
+        for (int i = 0; i < annotations.length; i++) {
+            String typeName = annotations[i].annotationType().getName();
+            int cnBegin = typeName.lastIndexOf('.') + 1;
 
-        Operation[] ops = new Operation[operationList.size()];
-        ops = operationList.toArray(ops);
-        Cycle.setCycles(ops, driverClass);
-        return ops;
+            String annotationName = typeName.substring(cnBegin);
+            String pkgName = typeName.substring(0, cnBegin);
+            String cycleName = pkgName + "engine." + annotationName;
+            Cycle cycle = null;
+            try {
+                cycle = Class.forName(cycleName).asSubclass(Cycle.class).newInstance();
+            }
+            catch (Exception e) {
+                // If the annotation is not a cycle, we just ignore it here.
+                // It is the responsibility of the corresponding facility to
+                // pick it up.
+                continue;
+            }
+            if (classCycle != null) {
+                throw new DefinitionException("Duplicate class cycle annotation @%s", annotationName);
+            }
+            cycle.init(annotations[i]);
+            classCycle = cycle;
+        }
+
+        // Now we make the same set of tests at the operation level
+        for (Operation o : operations) {
+            annotations = o.getMethod().getAnnotations();
+            for (int i = 0; i < annotations.length; i++) {
+                String typeName = annotations[i].annotationType().getName();
+                int cnBegin = typeName.lastIndexOf('.') + 1;
+
+                String annotationName = typeName.substring(cnBegin);
+                String pkgName = typeName.substring(0, cnBegin);
+                String cycleName = pkgName + "engine." + annotationName;
+                Cycle cycle = null;
+                try {
+                    cycle = Class.forName(cycleName).asSubclass(Cycle.class).newInstance();
+                }
+                catch (Exception e) {
+                    // If the annotation is not a cycle, we just ignore it here.
+                    // It is the responsibility of the corresponding facility to
+                    // pick it up.
+                    continue;
+                }
+                if (o.getCycle() != null) {
+                    throw new DefinitionException("Duplicate operation cycle annotation for operation %s @%s", o.getName(), annotationName);
+                }
+                cycle.init(annotations[i]);
+                o.setCycle(cycle);
+            }
+
+            // Finally, we need to test for no cycle at all and handle the case
+            if (o.getCycle() == null) {
+                o.setCycle(classCycle);
+            }
+            if (o.getCycle() == null) {
+                throw new DefinitionException("No cycle distribution annotation for operation %s", o.getName());
+            }
+        }
     }
 
     static void populatePrePost(Class<?> driverClass, Driver driver)
@@ -478,20 +520,19 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
                     driver.preRun = new DriverMethod();
                     driver.preRun.m = m;
                     driver.preRun.genericName = m.toGenericString();
-                } else {
-                    throw new DefinitionException("Found more than one " +
-                            "@OnceBefore method, " + driver.preRun.genericName +
-                            " and " + m.toGenericString() + ".");
                 }
-            } else if (m.isAnnotationPresent(OnceAfter.class)) {
+                else {
+                    throw new DefinitionException("Found more than one @OnceBefore method, %s and %s.", driver.preRun.genericName, m.toGenericString());
+                }
+            }
+			else if (m.isAnnotationPresent(OnceAfter.class)) {
                 if (driver.postRun == null) {
                     driver.postRun = new DriverMethod();
                     driver.postRun.m = m;
                     driver.postRun.genericName = m.toGenericString();
-                } else {
-                    throw new DefinitionException("Found more than one " +
-                            "@OnceAfter method, " + driver.postRun.genericName +
-                            " and " + m.toGenericString() + ".");
+                }
+                else {
+                    throw new DefinitionException("Found more than one @OnceAfter method, %s and %s.", driver.postRun.genericName, m.toGenericString());
                 }
             }
 		}
@@ -510,7 +551,7 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
 
             // Find a method in the list that is null
             for (i = 0; i < operations.length; i++ ) {
-				if (operations[i].m == null) {
+				if (operations[i].getMethod() == null) {
 					break;
 				}
 			}
@@ -521,23 +562,21 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
 			}
         }
 
-        HashMap<String, Method> methodMap =
-                new HashMap<String, Method>();
+        HashMap<String, Method> methodMap = new HashMap<String, Method>();
 
         // First we read all the operations that have the annotation
         Method[] methods = driverClass.getMethods();
         for (Method m : methods) {
 			if (m.isAnnotationPresent(BenchmarkOperation.class)) {
-                BenchmarkOperation benchOp = m.getAnnotation(
-                        BenchmarkOperation.class);
+                BenchmarkOperation benchOp = m.getAnnotation(BenchmarkOperation.class);
                 methodMap.put(benchOp.name(), m);
             }
 		}
 
         // Then we check each operation and get the method from the map.
         for (Operation o : operations) {
-			if (o.m == null) {
-				o.m = methodMap.get(o.name);
+			if (o.getMethod() == null) {
+				o.setMethod(methodMap.get(o.getName()));
 			}
 		}
     }
@@ -742,7 +781,7 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
 
             // Copy operation references into a flat array.
             int totalOps = operations.length;
-            clone.operations = new BenchmarkDefinition.Operation[totalOps];
+            clone.operations = new Operation[totalOps];
             System.arraycopy(clone.mix[0].operations, 0, clone.operations, 0,
                     mix[0].operations.length);
             System.arraycopy(clone.mix[1].operations, 0, clone.operations,
@@ -790,38 +829,6 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
                 Logger logger = Logger.getLogger(this.getClass().getName());
                 logger.log(Level.SEVERE, "Unexpected exception!", e);
             }
-            return clone;
-        }
-    }
-
-    static class Operation implements Serializable, Cloneable {
-
-		private static final long serialVersionUID = 1L;
-		
-		String name;
-        double[] percentileLimits;
-        double max90th;
-        Timing timing;
-        boolean countToMetric;
-        Cycle cycle;
-
-        transient Method m;
-
-        /**
-         * Creates an exact deep clone of this object.
-         * 
-         * @return a clone of this instance.
-         * @throws CloneNotSupportedException if the object's class does not
-         *                                    support the <code>Cloneable</code> interface. Subclasses
-         *                                    that override the <code>clone</code> method can also
-         *                                    throw this exception to indicate that an instance cannot
-         *                                    be cloned.
-         * @see Cloneable
-         */
-        @Override
-		public Object clone() throws CloneNotSupportedException {
-            Operation clone = (Operation) super.clone();
-            clone.cycle = (Cycle) cycle.clone();
             return clone;
         }
     }

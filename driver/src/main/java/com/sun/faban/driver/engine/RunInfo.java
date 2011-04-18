@@ -328,7 +328,7 @@ public class RunInfo implements Serializable {
 
             // Copy operation references into a flat array.
             int totalOps = driverDef.operations.length;
-            operations = new BenchmarkDefinition.Operation[totalOps];
+            operations = new Operation[totalOps];
             for (int j = 0; j < mix[0].operations.length; j++) {
 				operations[j] = mix[0].operations[j];
 			}

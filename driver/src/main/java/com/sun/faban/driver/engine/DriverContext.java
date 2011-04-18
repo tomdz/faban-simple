@@ -171,8 +171,7 @@ public class DriverContext extends com.sun.faban.driver.DriverContext {
      */
 	public Logger getLogger() {
         if (logger == null) {
-            logger = Logger.getLogger(agentThread.driverConfig.
-                    className + '.' + agentThread.id);
+            logger = Logger.getLogger(agentThread.driverConfig.className + '.' + agentThread.id);
             if (agentThread.runInfo.logHandler != null) {
 				logger.addHandler(agentThread.runInfo.logHandler);
 			}
@@ -186,10 +185,10 @@ public class DriverContext extends com.sun.faban.driver.DriverContext {
      *         or null if called from outside an operation.
      */
 	public String getCurrentOperation() {
-        if (agentThread.currentOperation == -1)
+        if (agentThread.currentOperation == -1) {
             return null;
-        return agentThread.driverConfig.operations[
-                agentThread.currentOperation].name;
+        }
+        return agentThread.driverConfig.operations[agentThread.currentOperation].getName();
     }
 
     /**
@@ -421,11 +420,10 @@ public class DriverContext extends com.sun.faban.driver.DriverContext {
      * @throws IllegalStateException if the operation uses auto timing
      */
 	public void recordTime() {
-        if (agentThread.currentOperation == -1)
-            throw new IllegalStateException("DriverContext.recordTime called " +
-                                            "outside an operation");
-        if (agentThread.driverConfig.operations[agentThread.currentOperation].
-                timing != Timing.MANUAL) {
+        if (agentThread.currentOperation == -1) {
+            throw new IllegalStateException("DriverContext.recordTime called outside an operation");
+        }
+        if (agentThread.driverConfig.operations[agentThread.currentOperation].getTiming() != Timing.MANUAL) {
             String msg = "Driver: " + getDriverName() + ", Operation: " +
                     getCurrentOperation() + ", timing: MANUAL illegal call " +
                     "to recordTime() in driver code.";
@@ -439,12 +437,13 @@ public class DriverContext extends com.sun.faban.driver.DriverContext {
                 timer.wakeupAt(timingInfo.intendedInvokeTime);
                 // But since sleep may not be exact, we get the time again here.
                 timingInfo.invokeTime = System.nanoTime();
-            } else if (timingInfo.lastRespondTime != TIME_NOT_SET) {
+            }
+			else if (timingInfo.lastRespondTime != TIME_NOT_SET) {
                 // The critical section was paused.
-                timingInfo.pauseTime +=
-                        System.nanoTime() - timingInfo.lastRespondTime;
+                timingInfo.pauseTime += System.nanoTime() - timingInfo.lastRespondTime;
                 timingInfo.lastRespondTime = TIME_NOT_SET;
-            } else {
+            }
+			else {
                 timingInfo.respondTime = System.nanoTime();
             }
 		}
@@ -458,11 +457,10 @@ public class DriverContext extends com.sun.faban.driver.DriverContext {
      * pauseTime when the critical section is already paused are simply ignored. 
      */
 	public void pauseTime() {
-        if (agentThread.currentOperation == -1)
-            throw new IllegalStateException("DriverContext.pauseTime called " +
-                                            "outside an operation");
-        if (agentThread.driverConfig.operations[agentThread.currentOperation].
-                timing != Timing.MANUAL) {
+        if (agentThread.currentOperation == -1) {
+            throw new IllegalStateException("DriverContext.pauseTime called outside an operation");
+        }
+        if (agentThread.driverConfig.operations[agentThread.currentOperation].getTiming() != Timing.MANUAL) {
             String msg = "Driver: " + getDriverName() + ", Operation: " +
                     getCurrentOperation() + ", timing: MANUAL illegal call " +
                     "to pauseTime() in driver code.";
@@ -587,23 +585,23 @@ public class DriverContext extends com.sun.faban.driver.DriverContext {
      */
     public long recordStartTime() {
         // Not in an operation, don't record time.
-        if (agentThread.currentOperation == -1)
+        if (agentThread.currentOperation == -1) {
             return TIME_NOT_SET;
-        if (timingInfo != null && agentThread.driverConfig.operations[
-                agentThread.currentOperation].timing == Timing.AUTO) {
+        }
+        if (timingInfo != null && agentThread.driverConfig.operations[agentThread.currentOperation].getTiming() == Timing.AUTO) {
             if (timingInfo.invokeTime == TIME_NOT_SET) {
-                if (timingInfo.respondTime != TIME_NOT_SET)
-                    logger.warning("Respond time already set before " +
-                                   "sleeping. Please report a bug.");
+                if (timingInfo.respondTime != TIME_NOT_SET) {
+                    logger.warning("Respond time already set before sleeping. Please report a bug.");
+                }
                 timer.wakeupAt(timingInfo.intendedInvokeTime);
                 // But since sleep may not be exact, we get the time again here.
                 timingInfo.invokeTime = System.nanoTime();
                 return timingInfo.invokeTime;
-            } else if (pauseSupported && timingInfo.respondTime != TIME_NOT_SET) {
-                if (timingInfo.respondTime < timingInfo.invokeTime)
-                    logger.warning("Respond time (" + timingInfo.respondTime +
-                            ") less than invoke time (" +
-                            timingInfo.invokeTime + "). Please report a bug.");
+            }
+            else if (pauseSupported && timingInfo.respondTime != TIME_NOT_SET) {
+                if (timingInfo.respondTime < timingInfo.invokeTime) {
+                    logger.warning("Respond time (" + timingInfo.respondTime + ") less than invoke time (" + timingInfo.invokeTime + "). Please report a bug.");
+                }
 
                 // Some response already read, then transmit again.
                 // In this case the time from last receive to this transmit
@@ -633,22 +631,18 @@ public class DriverContext extends com.sun.faban.driver.DriverContext {
         long tstamp = TIME_NOT_SET;
         // Not in an operation, don't record time.
         if (agentThread.currentOperation != -1) {
-            if (timingInfo != null && agentThread.driverConfig.operations[
-                    agentThread.currentOperation].timing == Timing.AUTO ) {
+            if (timingInfo != null && agentThread.driverConfig.operations[agentThread.currentOperation].getTiming() == Timing.AUTO ) {
                 // Some stacks clear the connection by doing a read before a
                 // write in a request, normally a read of 0 bytes. We need to
                 // make sure such reads are not part of the response time.
                 if (timingInfo.invokeTime == TIME_NOT_SET) {
                     int[] previousOps = agentThread.previousOperation;
-                    String name = agentThread.driverConfig.mix[0].
-                            operations[previousOps[0]].name;
+                    String name = agentThread.driverConfig.mix[0].operations[previousOps[0]].getName();
                     if (previousOps.length > 1)
-                        name += ',' + agentThread.driverConfig.mix[1].
-                                operations[previousOps[1]].name;
-                    logger.warning("Read before write! Some input may still " +
-                            "be in the buffer from previous operation " +
-                            name + ". Ignoring such input.");
-                } else {
+                        name += ',' + agentThread.driverConfig.mix[1].operations[previousOps[1]].getName();
+                    logger.warning("Read before write! Some input may still be in the buffer from previous operation " + name + ". Ignoring such input.");
+                }
+                else {
                     timingInfo.respondTime = tstamp = System.nanoTime();
                 }
             }

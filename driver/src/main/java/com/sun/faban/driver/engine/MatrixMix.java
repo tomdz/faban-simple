@@ -214,10 +214,9 @@ public class MatrixMix extends Mix {
         // Then we have to extract the ratio map based on the defined name list
         double[][] ratios = new double[operations.length][];
         for (int i = 0; i < operations.length; i++) {
-            ratios[i] = ratioMap.remove(operations[i].name);
+            ratios[i] = ratioMap.remove(operations[i].getName());
             if (ratios[i] == null) {
-				throw new ConfigurationException("Configured ratio for " +
-                        "operation " + operations[i].name + " not found");
+				throw new ConfigurationException("Configured ratio for operation " + operations[i].getName() + " not found");
 			}
         }
 
@@ -231,8 +230,7 @@ public class MatrixMix extends Mix {
 				}
                 msg += i.next();
             }
-            throw new ConfigurationException("Invalid operation name(s) in " +
-                    "operationMix configuration: " + msg + '.');
+            throw new ConfigurationException("Invalid operation name(s) in operationMix configuration: " + msg + '.');
         }
 
         // But the ratios are still sorted by the configured list which
@@ -240,7 +238,7 @@ public class MatrixMix extends Mix {
         // sort through each row.
         for (int i = 0; i < ratios.length; i++) {
 			for (int j = 0; j < operations.length; j++) {
-                int position = positionMap.get(operations[j].name);
+                int position = positionMap.get(operations[j].getName());
                 mix[i][j] = ratios[i][position];
             }
 		}
@@ -418,10 +416,10 @@ public class MatrixMix extends Mix {
         StringBuffer buffer = new StringBuffer();
         buffer.append("MatrixMix\n");
         buffer.append("operations: ");
-        buffer.append(operations[0].name);
+        buffer.append(operations[0].getName());
         for (int i = 1; i < operations.length; i++) {
             buffer.append(", ");
-            buffer.append(operations[i].name);
+            buffer.append(operations[i].getName());
         }
         buffer.append("\nmix:\n");
         for (int i = 0; i < mix.length; i++) {

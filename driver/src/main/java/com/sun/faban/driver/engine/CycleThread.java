@@ -105,21 +105,21 @@ public class CycleThread extends AgentThread {
 
             // Save the previous operation
             previousOperation[mixId] = currentOperation;
-            BenchmarkDefinition.Operation previousOp = null;
+            Operation previousOp = null;
             if (previousOperation[mixId] >= 0) {
 				previousOp = driverConfig.operations[currentOperation];
 			}
 
             // Select the operation
             currentOperation = selector[0].select();
-            BenchmarkDefinition.Operation op =
+            Operation op =
                     driverConfig.operations[currentOperation];
 
             driverContext.setInvokeTime(getInvokeTime(previousOp, mixId));
 
             // Invoke the operation
             try {
-                op.m.invoke(driver);
+                op.getMethod().invoke(driver);
                 validateTimeCompletion(op);
                 checkRamp();
                 metrics.recordTx();
@@ -144,8 +144,7 @@ public class CycleThread extends AgentThread {
                 // it back to respondTime.
                 if (timingInfo.respondTime == TIME_NOT_SET &&
                     timingInfo.lastRespondTime != TIME_NOT_SET) {
-                    logger.fine("Potential open request in operation " +
-                            op.m.getName() + ".");
+                    logger.fine("Potential open request in operation " + op.getMethod().getName() + ".");
                     timingInfo.respondTime = timingInfo.lastRespondTime;
                 }
 
@@ -171,7 +170,7 @@ public class CycleThread extends AgentThread {
                     metrics.recordDelayTime();
                 }
             } catch (IllegalAccessException e) {
-                logger.log(Level.SEVERE, name + "." + op.m.getName() + ": "
+                logger.log(Level.SEVERE, name + "." + op.getMethod().getName() + ": "
                         + e.getMessage(), e);
                 agent.abortRun();
                 return;

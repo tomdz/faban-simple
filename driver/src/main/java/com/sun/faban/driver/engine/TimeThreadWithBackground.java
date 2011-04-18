@@ -112,8 +112,8 @@ public class TimeThreadWithBackground extends TimeThread {
         logger.fine(name + ": Start of run.");
         
         // Next fg and bg operation
-        BenchmarkDefinition.Operation[] op = 
-                new BenchmarkDefinition.Operation[2];
+        Operation[] op = 
+                new Operation[2];
         // Next fg and bg time
         long[] invokeTime = new long[2];
 
@@ -150,7 +150,7 @@ public class TimeThreadWithBackground extends TimeThread {
             // Select the operations and invoke times
             if (mixId != 1) {
                 previousOperation[0] = mixOperation[0];
-                BenchmarkDefinition.Operation previousOp = null;
+                Operation previousOp = null;
                 if (previousOperation[0] >= 0) {
                     previousOp = driverConfig.operations[currentOperation];
                 }
@@ -162,7 +162,7 @@ public class TimeThreadWithBackground extends TimeThread {
 
             if (mixId != 0) {
                 previousOperation[1] = mixOperation[1];
-                BenchmarkDefinition.Operation previousOp = null;
+                Operation previousOp = null;
                 if (previousOperation[1] >= 0) {
                     previousOp = driverConfig.operations[currentOperation];
                 }
@@ -194,7 +194,7 @@ public class TimeThreadWithBackground extends TimeThread {
 
             // Invoke the operation
             try {
-                op[mixId].m.invoke(driver);
+                op[mixId].getMethod().invoke(driver);
                 validateTimeCompletion(op[mixId]);
                 checkRamp();
                 metrics.recordTx();
@@ -218,7 +218,7 @@ public class TimeThreadWithBackground extends TimeThread {
                 if (timingInfo.respondTime == TIME_NOT_SET &&
                         timingInfo.lastRespondTime != TIME_NOT_SET) {
                     logger.fine("Potential open request in operation " +
-                            op[mixId].m.getName() + ".");
+                            op[mixId].getMethod().getName() + ".");
                     timingInfo.respondTime = timingInfo.lastRespondTime;
                 }
                 // If it never waited, we'll see whether we can just use
@@ -254,7 +254,7 @@ public class TimeThreadWithBackground extends TimeThread {
                 }
             } catch (IllegalAccessException e) {
                 logger.log(Level.SEVERE, name + "." +
-                        op[mixId].m.getName() + ": " + e.getMessage(), e);
+                        op[mixId].getMethod().getName() + ": " + e.getMessage(), e);
                 agent.abortRun();
                 return;
             }

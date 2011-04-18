@@ -195,10 +195,9 @@ public class FlatMix extends Mix {
 		}
 
         for (int i = 0; i < operations.length; i++) {
-            Double value = ratioMap.remove(operations[i].name);
+            Double value = ratioMap.remove(operations[i].getName());
             if (value == null) {
-                String msg = "Configured ratio for operation " +
-                        operations[i].name + " not found";
+                String msg = "Configured ratio for operation " + operations[i].getName() + " not found";
                 getLogger().severe(msg);
                 ConfigurationException e = new ConfigurationException(msg);
                 getLogger().throwing(className, "configure", e);
@@ -210,15 +209,13 @@ public class FlatMix extends Mix {
         // By now, the map should be empty
         if (ratioMap.size() > 0) {
             String msg = "";
-            for (Iterator<String> i = ratioMap.keySet().iterator();
-                 i.hasNext();) {
+            for (Iterator<String> i = ratioMap.keySet().iterator(); i.hasNext();) {
                 if (msg.length() > 0) {
 					msg += ", ";
 				}
                 msg += i.next();
             }
-            msg = "Invalid operation name(s) in operationMix " +
-                    "configuration: " + msg + '.';
+            msg = "Invalid operation name(s) in operationMix configuration: " + msg + '.';
             getLogger().severe(msg);
             ConfigurationException e = new ConfigurationException(msg);
             getLogger().throwing(className, "configure", e);
@@ -234,8 +231,7 @@ public class FlatMix extends Mix {
      */
     public void validate() throws DefinitionException {
         if (mix.length != operations.length) {
-            String msg = "Mix ratios must be " + operations.length +
-                    "(#ops) in size!\nFound " + mix.length + ".";
+            String msg = "Mix ratios must be " + operations.length + "(#ops) in size!\nFound " + mix.length + ".";
             getLogger().severe(msg);
             DefinitionException e = new DefinitionException(msg);
             getLogger().throwing(className, "validate", e);
@@ -250,8 +246,7 @@ public class FlatMix extends Mix {
      * generator to 1.
      */
 	public void normalize() {
-        // if (logger.isLoggable(Level.FINEST))
-            getLogger().finest("normalize - before\n" + toString());
+        getLogger().finest("normalize - before\n" + toString());
 
         double rowTotal = 0d;
         for (int i = 0; i < mix.length; i++) {
@@ -261,8 +256,7 @@ public class FlatMix extends Mix {
 			mix[i] /= rowTotal;
 		}
 
-        // if (logger.isLoggable(Level.FINEST))
-            getLogger().finest("normalize - after\n" + toString());
+        getLogger().finest("normalize - after\n" + toString());
     }
 
     /**
@@ -285,10 +279,10 @@ public class FlatMix extends Mix {
         StringBuffer buffer = new StringBuffer();
         buffer.append("FlatMix\n");
         buffer.append("operations: ");
-        buffer.append(operations[0].name);
+        buffer.append(operations[0].getName());
         for (int i = 1; i < operations.length; i++) {
             buffer.append(", ");
-            buffer.append(operations[i].name);
+            buffer.append(operations[i].getName());
         }
         buffer.append("\nmix: ");
         buffer.append(mix[0]);

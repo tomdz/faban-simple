@@ -125,7 +125,7 @@ public class FixedSequence extends Mix {
         private int currentOp = -1;
         private int totalOps;
 
-        Selector(BenchmarkDefinition.Operation[] operations) {
+        Selector(Operation[] operations) {
             totalOps = operations.length;
         }
 

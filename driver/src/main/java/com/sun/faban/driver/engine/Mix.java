@@ -38,7 +38,7 @@ import java.util.logging.Logger;
  */
 public abstract class Mix implements Serializable, Cloneable {
 
-    BenchmarkDefinition.Operation[] operations;
+    Operation[] operations;
     double deviation;
 
     /** The actual class name of the implementing subclass. */
@@ -172,7 +172,7 @@ public abstract class Mix implements Serializable, Cloneable {
         try {
             clone = (Mix) super.clone();
             for (int i = 0; i < operations.length; i++) {
-				clone.operations[i] = (BenchmarkDefinition.Operation)
+				clone.operations[i] = (Operation)
                         operations[i].clone();
 			}
         } catch (CloneNotSupportedException e) {

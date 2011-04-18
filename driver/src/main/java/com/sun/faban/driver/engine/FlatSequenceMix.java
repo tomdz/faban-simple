@@ -269,10 +269,10 @@ public class FlatSequenceMix extends Mix {
         StringBuilder buffer = new StringBuilder();
         buffer.append("FlatSequenceMix\n");
         buffer.append("operations: ");
-        buffer.append(operations[0].name);
+        buffer.append(operations[0].getName());
         for (int i = 1; i < operations.length; i++) {
             buffer.append(", ");
-            buffer.append(operations[i].name);
+            buffer.append(operations[i].getName());
         }
         buffer.append("\nmix: ");
         buffer.append(mix[0]);

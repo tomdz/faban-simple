@@ -239,8 +239,8 @@ public abstract class AgentThread extends Thread {
      * @param e The throwable
      * @param op The operation
      */
-    void checkFatal(Throwable e, BenchmarkDefinition.Operation op) {
-        checkFatal(e, op.m);
+    void checkFatal(Throwable e, Operation op) {
+        checkFatal(e, op.getMethod());
     }
 
     /**
@@ -271,7 +271,7 @@ public abstract class AgentThread extends Thread {
      * @param e  The throwable received
      * @param op The operation being executed.
      */
-    void logError(Throwable e, BenchmarkDefinition.Operation op) {
+    void logError(Throwable e, Operation op) {
         String message = e.getMessage();
         if (message == null) { // Find the message in the highest level exception.
             Throwable t = e.getCause();
@@ -282,7 +282,7 @@ public abstract class AgentThread extends Thread {
         }
         if (message == null) // If still null, artificially create message.
             message = "Exception in operation.";
-        message = name + "." + op.m.getName() + ": " + message;
+        message = name + "." + op.getMethod().getName() + ": " + message;
 
         if (inRamp) {
 			message += "\nNote: Error not counted in result." +
@@ -437,14 +437,14 @@ public abstract class AgentThread extends Thread {
      * @param mixId The mix
      * @return The targeted invoke time.
      */
-    long getInvokeTime(BenchmarkDefinition.Operation op, int mixId) {
+    long getInvokeTime(Operation op, int mixId) {
         Cycle cycle;
         if (op == null) {
 			// No op, this is the initial cycle, use initialDelay
             cycle = runInfo.driverConfig.initialDelay[mixId];
 		} else {
 			// Set the start time based on the operation selected
-            cycle = op.cycle;
+            cycle = op.getCycle();
 		}
 
         long invokeTime = TIME_NOT_SET;
@@ -487,7 +487,7 @@ public abstract class AgentThread extends Thread {
      * captured. Called by AgentThread implementations.
      * @param op The operation.
      */
-    void validateTimeCompletion(BenchmarkDefinition.Operation op) {
+    void validateTimeCompletion(Operation op) {
         DriverContext.TimingInfo timingInfo = driverContext.timingInfo;
 
         // If there is no error, we still check for the
@@ -495,14 +495,14 @@ public abstract class AgentThread extends Thread {
         // proper message.
         if (timingInfo.invokeTime == TIME_NOT_SET) {
             String msg = null;
-            if (driverConfig.operations[
-                    currentOperation].timing == Timing.AUTO) {
-                msg = name + '.' + op.m.getName() +
+            if (driverConfig.operations[currentOperation].getTiming() == Timing.AUTO) {
+                msg = name + '.' + op.getMethod().getName() +
                         ": Transport not called! " +
                         "Please ensure transport instantiation " +
                         "before making any remote calls!";
-            } else {
-                msg = name + '.' + op.m.getName() +
+            }
+            else {
+                msg = name + '.' + op.getMethod().getName() +
                         ": Cannot determine time! " +
                         "DriverContext.recordTime() not called " +
                         "before critical section in operation.";
@@ -511,17 +511,18 @@ public abstract class AgentThread extends Thread {
             logger.severe(msg);
             agent.abortRun();
             throw new FatalException(msg);
-        } else if (timingInfo.respondTime == TIME_NOT_SET &&
+        }
+        else if (timingInfo.respondTime == TIME_NOT_SET &&
                    timingInfo.lastRespondTime == TIME_NOT_SET) {
             String msg = null;
-            if (driverConfig.operations[
-                    currentOperation].timing == Timing.AUTO) {
-                msg = name + '.' + op.m.getName() +
+            if (driverConfig.operations[currentOperation].getTiming() == Timing.AUTO) {
+                msg = name + '.' + op.getMethod().getName() +
                         ": Transport incomplete! " +
                         "Please ensure transport exception is " +
                         "thrown from operation.";
-            } else {
-                msg = name + '.' + op.m.getName() +
+            }
+            else {
+                msg = name + '.' + op.getMethod().getName() +
                         ": Cannot determine end time! " +
                         "DriverContext.recordTime() not called " +
                         "after critical section in operation.";
@@ -530,10 +531,10 @@ public abstract class AgentThread extends Thread {
             logger.severe(msg);
             agent.abortRun();
             throw new FatalException(msg);
-        } else if (timingInfo.respondTime == TIME_NOT_SET) {
+        }
+        else if (timingInfo.respondTime == TIME_NOT_SET) {
             timingInfo.respondTime = timingInfo.lastRespondTime;
-            logger.fine("Potential open request in operation " +
-                    op.m.getName() + ".");
+            logger.fine("Potential open request in operation " + op.getMethod().getName() + ".");
         }
     }
 

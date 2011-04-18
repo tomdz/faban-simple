@@ -276,7 +276,7 @@ public class Metrics implements Serializable, Cloneable,
         // We cannot serialize the agent itself but we only need the names.
         txNames = new String[txTypes];
         for (int i = 0; i < driverConfig.operations.length; i++) {
-			txNames[i] = driverConfig.operations[i].name;
+			txNames[i] = driverConfig.operations[i].getName();
 		}
 
         // Initialize all the arrays.
@@ -328,13 +328,11 @@ public class Metrics implements Serializable, Cloneable,
         coarseRespHistMax = coarseRespBucketSize * (COARSE_RESPBUCKETS - 1) +
                                                     fineRespHistMax;
 
-        double delayHistMax = driverConfig.operations[0].
-                cycle.getHistogramMax();
+        double delayHistMax = driverConfig.operations[0].getCycle().getHistogramMax();
 
         // Find the max delay time histogram among ops, in ns
         for (int i = 1; i < txTypes; i++) {
-            double opMaxDelay = driverConfig.operations[i].
-                    cycle.getHistogramMax();
+            double opMaxDelay = driverConfig.operations[i].getCycle().getHistogramMax();
             if (opMaxDelay > delayHistMax) {
 				delayHistMax = opMaxDelay;
 			}
@@ -456,11 +454,11 @@ public class Metrics implements Serializable, Cloneable,
                               thread.startTime[thread.mixId];
 		}
 
-        CycleType cycleType = RunInfo.getInstance().driverConfig.
-                operations[thread.currentOperation].cycle.cycleType;
+        CycleType cycleType = RunInfo.getInstance().driverConfig.operations[thread.currentOperation].getCycle().cycleType;
         switch (cycleType) {
             case CYCLETIME :
-                actualDelayTime = actualCycleTime; break;
+                actualDelayTime = actualCycleTime;
+                break;
             case THINKTIME :
                 if (thread.endTime[thread.mixId] >= 0) {// Normal
                     if (thread.isSteadyState(thread.endTime[thread.mixId],
@@ -468,9 +466,11 @@ public class Metrics implements Serializable, Cloneable,
                         actualDelayTime = timingInfo.invokeTime -
                                 thread.endTime[thread.mixId];
 					}
-                } else { // Exceptions occurred, no respond time available
+                }
+                else { // Exceptions occurred, no respond time available
                     actualDelayTime = actualCycleTime;
                 }
+                break;
         }
 
         if (thread.mixId == 0 && actualCycleTime >= 0) {
@@ -947,8 +947,9 @@ public class Metrics implements Serializable, Cloneable,
 
         for (int i = 0; i < txTypes; i++) {
             sumTxCnt += txCntStdy[i];
-            if (driver.operations[i].countToMetric)
+            if (driver.operations[i].isCountToMetric()) {
                 metricTxCnt += txCntStdy[i];
+            }
 		}
 
         for (int i = 0; i < fgTxTypes; i++) {
@@ -1060,8 +1061,9 @@ public class Metrics implements Serializable, Cloneable,
                 space(12, buffer);
                 formatter.format("<operation name=\"%s%s\">\n",
                                  txNames[i], nameModifier);
-            } else { // Old format
-                max90 = driver.operations[i].max90th;
+            }
+            else { // Old format
+                max90 = driver.operations[i].getMax90th();
                 max90nanos = Math.round(max90 * precision);
 
                 space(12, buffer);
@@ -1110,7 +1112,7 @@ public class Metrics implements Serializable, Cloneable,
                             respPct =
                                   2 * coarseRespBucketSize + coarseRespHistMax;
 
-                        double limit = driver.operations[i].percentileLimits[j];
+                        double limit = driver.operations[i].getPercentileLimits()[j];
                         String limitString = "";
                         if (limit > 0d)
                             limitString =
@@ -1249,9 +1251,13 @@ public class Metrics implements Serializable, Cloneable,
             }
 
             String typeString = null;
-            switch (driver.operations[i].cycle.cycleType) {
-                case CYCLETIME: typeString = "cycleTime"; break;
-                case THINKTIME: typeString = "thinkTime";
+            switch (driver.operations[i].getCycle().cycleType) {
+                case CYCLETIME:
+                    typeString = "cycleTime";
+                    break;
+                case THINKTIME:
+                    typeString = "thinkTime";
+                    break;
             }
             space(12, buffer).append("<operation name=\"").append(txNames[i]).
                     append(nameModifier).append("\" type=\"").
@@ -1272,10 +1278,8 @@ public class Metrics implements Serializable, Cloneable,
 
                 // Make sure we're not dealing with the 0 think time case.
                 // We cannot check a deviation on 0 think time.
-                if (driver.operations[i].cycle.cycleType == CycleType.CYCLETIME
-                        || tavg > 0.001d) {
-                    passDelay = (Math.abs(avg - tavg)/tavg <=
-                            driver.operations[i].cycle.cycleDeviation /100d);
+                if (driver.operations[i].getCycle().cycleType == CycleType.CYCLETIME || tavg > 0.001d) {
+                    passDelay = (Math.abs(avg - tavg)/tavg <= driver.operations[i].getCycle().cycleDeviation /100d);
 				}
 
                 space(16, buffer);

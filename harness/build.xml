@@ -41,7 +41,7 @@
 
     <path id="class.path">
         <fileset dir="lib" includes="*.jar"/>
-        <fileset dir="../stage/master/common/lib" includes="*.jar"/>
+        <fileset dir="../common/target" includes="*.jar"/>
     </path>
 
     <path id="test.class.path">
@@ -64,7 +64,7 @@
     </path>
 
     <target name="init">
-        <copy file="../common/${jar.output}/fabancommon.jar"
+        <copy file="../common/target/faban-common-1.0.0-SNAPSHOT.jar"
               tofile="${lib.dir}/fabancommon.jar"/>
     </target>
 
