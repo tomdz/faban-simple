@@ -991,8 +991,7 @@ public class MasterImpl extends UnicastRemoteObject implements Master {
      * @param results List of Host-Metrics maps, one per driver type
      * @throws IOException 
      */
-    public void generateReports(List<Map<String, Metrics>> results)
-            throws IOException {
+    public void generateReports(List<Map<String, Metrics>> results) throws IOException {
 
         // Set of driver hosts.
         LinkedHashSet<String> hostSet = new LinkedHashSet<String>();
@@ -1004,14 +1003,11 @@ public class MasterImpl extends UnicastRemoteObject implements Master {
         // Only print the per-host results if there is more than one driver host
         if (hostSet.size() > 1) {
             for (String host : hostSet) {
-                CharSequence summaryContent = createSummaryReport(
-                                        getHostMetrics(results, host), host);
+                CharSequence summaryContent = createSummaryReport(getHostMetrics(results, host), host);
                 if (summaryContent != null) {
                     String runOutputDir = runInfo.resultsDir + fs;
-                    FileWriter summary = new FileWriter(runOutputDir + 
-                            "summary.xml." + host);
-                    FileWriter detail = new FileWriter(runOutputDir + 
-                            "detail.xan." + host);
+                    FileWriter summary = new FileWriter(runOutputDir + "summary.xml." + host);
+                    FileWriter detail = new FileWriter(runOutputDir + "detail.xan." + host);
 
                     // As all stats from each agentImpl are of the same type,
                     // we can create a new instance from any instance.
@@ -1019,10 +1015,8 @@ public class MasterImpl extends UnicastRemoteObject implements Master {
                     summary.append(summaryContent);
                     summary.close();
 
-                    logger.info("Summary finished. Now printing detail for " + 
-                            host + " ...");
-                    detail.append(createDetailReport(
-                                        getHostMetrics(results, host), host));
+                    logger.info("Summary finished. Now printing detail for " +host + " ...");
+                    detail.append(createDetailReport(getHostMetrics(results, host), host));
                     detail.close();
 
                     logger.info("Detail for " + host + " finished.");
@@ -1030,8 +1024,7 @@ public class MasterImpl extends UnicastRemoteObject implements Master {
             }
         }
 
-        CharSequence summaryContent = createSummaryReport(
-                                getHostMetrics(results, "__MASTER__"), null);
+        CharSequence summaryContent = createSummaryReport(getHostMetrics(results, "__MASTER__"), null);
         if (summaryContent != null) {
             String runOutputDir = runInfo.resultsDir + fs;
             FileWriter summary = new FileWriter(runOutputDir + "summary.xml");
@@ -1044,12 +1037,10 @@ public class MasterImpl extends UnicastRemoteObject implements Master {
             summary.close();
 
             logger.info("Summary finished. Now printing detail ...");
-            detail.append(createDetailReport(
-                                getHostMetrics(results, "__MASTER__"), null));
+            detail.append(createDetailReport(getHostMetrics(results, "__MASTER__"), null));
             detail.close();
 
-            logger.info("Detail finished. Results written to " +
-                    runInfo.resultsDir + '.');
+            logger.info("Detail finished. Results written to " + runInfo.resultsDir + '.');
         }
     }
 
@@ -1071,8 +1062,7 @@ public class MasterImpl extends UnicastRemoteObject implements Master {
 
         for (int i = 0; i < results.length; i++) {
             if (results[i] == null) {
-                logger.warning("Unable to obtain " + benchDef.drivers[i].name +
-                        " results, ignoring...");
+                logger.warning("Unable to obtain " + benchDef.drivers[i].name + " results, ignoring...");
                 continue;
             }
             if (results[i].startTime < startTime) {
@@ -1094,33 +1084,41 @@ public class MasterImpl extends UnicastRemoteObject implements Master {
         if (startTime == Long.MAX_VALUE || endTime == 0l) {
             logger.severe("Unable to obtain any results");
             buffer = null;
-        } else {
+        }
+        else {
             StringBuilder hdrBuffer = new StringBuilder(1024);
-            String xslPath =
-                    System.getProperty("faban.xsl.path", "../../xslt/");
+            String xslPath = System.getProperty("faban.xsl.path", "../../xslt/");
             if (!xslPath.endsWith("/")) {
                 xslPath += '/';
             }
             hdrBuffer.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-            hdrBuffer.append("<?xml-stylesheet type=\"text/xsl\" href=\"").
-                    append(xslPath).append("summary_report.xsl\"?>\n");
+            hdrBuffer.append("<?xml-stylesheet type=\"text/xsl\" href=\"");
+            hdrBuffer.append(xslPath);
+            hdrBuffer.append("summary_report.xsl\"?>\n");
             hdrBuffer.append("<benchResults>\n");
-            hdrBuffer.append("    <benchSummary name=\"").append(benchDef.name).
-                    append("\" version=\"").append(benchDef.version);
-            if (host != null)
-                hdrBuffer.append("\" host=\"").append(host);
+            hdrBuffer.append("    <benchSummary name=\"");
+            hdrBuffer.append(benchDef.name);
+            hdrBuffer.append("\" version=\"");
+            hdrBuffer.append(benchDef.version);
+            if (host != null) {
+                hdrBuffer.append("\" host=\"");
+                hdrBuffer.append(host);
+            }
             hdrBuffer.append("\">\n");
-            hdrBuffer.append("        <runId>").append(runInfo.runId).
-                    append("</runId>\n");
-            hdrBuffer.append("        <startTime>").append(new Date(startTime)).
-                    append("</startTime>\n");
-            hdrBuffer.append("        <endTime>").append(new Date(endTime)).
-                    append("</endTime>\n");
+            hdrBuffer.append("        <runId>");
+            hdrBuffer.append(runInfo.runId);
+            hdrBuffer.append("</runId>\n");
+            hdrBuffer.append("        <startTime>");
+            hdrBuffer.append(new Date(startTime));
+            hdrBuffer.append("</startTime>\n");
+            hdrBuffer.append("        <endTime>");
+            hdrBuffer.append(new Date(endTime));
+            hdrBuffer.append("</endTime>\n");
             Formatter formatter = new Formatter(hdrBuffer);
-            formatter.format("        <metric unit=\"%s\">%.03f</metric>\n",
-                    benchDef.metric, metric);
-            hdrBuffer.append("        <passed>").append(passed).
-                    append("</passed>\n");
+            formatter.format("        <metric unit=\"%s\">%.03f</metric>\n", benchDef.metric, metric);
+            hdrBuffer.append("        <passed>");
+            hdrBuffer.append(passed);
+            hdrBuffer.append("</passed>\n");
             hdrBuffer.append("    </benchSummary>\n");
 
             buffer.insert(0, hdrBuffer);
@@ -1128,8 +1126,6 @@ public class MasterImpl extends UnicastRemoteObject implements Master {
         }
         return buffer;
     }
-
-
 
     /**
      * Aggregates detail results into a single buffer.
@@ -1140,45 +1136,48 @@ public class MasterImpl extends UnicastRemoteObject implements Master {
     private CharSequence createDetailReport(Metrics[] results, String host) {
         StringBuilder buffer = new StringBuilder(8192);
         buffer.append("Title: ").append(benchDef.name);
-        if (host == null)
+        if (host == null) {
             buffer.append(" Detailed Results");
-        else
-            buffer.append(" Partial Detailed Results for Driver ").append(host);
+        }
+        else {
+            buffer.append(" Partial Detailed Results for Driver ");
+            buffer.append(host);
+        }
         buffer.append("\n\n\nSection: Benchmark Information\n");
         buffer.append("Name     Value\n");
         buffer.append("-----    -------------\n");
-        buffer.append("RunId    ").append(runInfo.runId);
+        buffer.append("RunId    ");
+        buffer.append(runInfo.runId);
         if (host != null) {
             buffer.append("\nPartial  true");
-            buffer.append("\nHost     ").append(host);
+            buffer.append("\nHost     ");
+            buffer.append(host);
         }
         buffer.append("\n\n\n");
-        for (Metrics result : results)
-            if (result != null)
+        for (Metrics result : results) {
+            if (result != null) {
                 result.printDetail(buffer);
-
+            }
+        }
         return buffer;
     }
 
     public void updateMetrics(RuntimeMetrics m) {
         if (statsWriter == null) {
-            logger.severe("Runtime stats disabled, yet agent is trying to " +
-                          "update runtime metrics. Please log this as a bug.");
+            logger.severe("Runtime stats disabled, yet agent is trying to update runtime metrics. Please log this as a bug.");
             return;
         }
         try {
             statsWriter.queue.put(m);
-        } catch (InterruptedException e) {
-            logger.log(Level.WARNING,
-                    "Interrupted queueing runtime stats.", e);
+        }
+        catch (InterruptedException e) {
+            logger.log(Level.WARNING, "Interrupted queueing runtime stats.", e);
         }
     }
 
-    private class RuntimeMetricsProvider
-            implements PairwiseAggregator.Provider<RuntimeMetrics> {
+    private class RuntimeMetricsProvider implements PairwiseAggregator.Provider<RuntimeMetrics> {
 
-        public ArrayList<RuntimeMetrics> metrices =
-                new ArrayList<RuntimeMetrics>();
+        public ArrayList<RuntimeMetrics> metrices = new ArrayList<RuntimeMetrics>();
 
         public void add(RuntimeMetrics m) {
             metrices.add(m);
@@ -1192,7 +1191,6 @@ public class MasterImpl extends UnicastRemoteObject implements Master {
             instance.add(metrices.get(idx));
         }
 
-
         public Class getComponentClass() {
             return RuntimeMetrics.class;
         }
@@ -1201,10 +1199,12 @@ public class MasterImpl extends UnicastRemoteObject implements Master {
         }
 
         public int getSequence() {
-            if (metrices.size() == 0)
+            if (metrices.size() == 0) {
                 return -1;
-            else
+            }
+            else {
                 return metrices.get(0).sequence;
+            }
         }
 
         public void reset() {

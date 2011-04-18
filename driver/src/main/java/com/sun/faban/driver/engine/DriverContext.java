@@ -27,7 +27,7 @@ import com.sun.faban.common.FabanNamespaceContext;
 import com.sun.faban.driver.CustomMetrics;
 import com.sun.faban.driver.CustomTableMetrics;
 import com.sun.faban.driver.Timing;
-import static com.sun.faban.driver.engine.AgentThread.TIME_NOT_SET;
+
 import com.sun.faban.driver.util.Random;
 import com.sun.faban.driver.util.Timer;
 import org.w3c.dom.Attr;
@@ -424,27 +424,26 @@ public class DriverContext extends com.sun.faban.driver.DriverContext {
             throw new IllegalStateException("DriverContext.recordTime called outside an operation");
         }
         if (agentThread.driverConfig.operations[agentThread.currentOperation].getTiming() != Timing.MANUAL) {
-            String msg = "Driver: " + getDriverName() + ", Operation: " +
-                    getCurrentOperation() + ", timing: MANUAL illegal call " +
-                    "to recordTime() in driver code.";
+            String msg = String.format("Driver: %s, Operation: %s, timing: MANUAL illegal call to recordTime() in driver code.",
+                                       getDriverName(), getCurrentOperation());
             logger.severe(msg);
             IllegalStateException e = new IllegalStateException(msg);
             logger.throwing(className, "recordTime", e);
             throw e;
         }
         if (timingInfo != null) {
-			if (timingInfo.invokeTime == TIME_NOT_SET) {
-                timer.wakeupAt(timingInfo.intendedInvokeTime);
+			if (!timingInfo.hasInvokeTime()) {
+                timer.wakeupAt(timingInfo.getIntendedInvokeTime());
                 // But since sleep may not be exact, we get the time again here.
-                timingInfo.invokeTime = System.nanoTime();
+                timingInfo.setInvokeTime(System.nanoTime());
             }
-			else if (timingInfo.lastRespondTime != TIME_NOT_SET) {
+			else if (timingInfo.hasLastRespondTime()) {
                 // The critical section was paused.
-                timingInfo.pauseTime += System.nanoTime() - timingInfo.lastRespondTime;
-                timingInfo.lastRespondTime = TIME_NOT_SET;
+                timingInfo.setPauseTime(timingInfo.getPauseTime() + System.nanoTime() - timingInfo.getLastRespondTime());
+                timingInfo.clearLastRespondTime();
             }
 			else {
-                timingInfo.respondTime = System.nanoTime();
+                timingInfo.setRespondTime(System.nanoTime());
             }
 		}
     }
@@ -461,16 +460,15 @@ public class DriverContext extends com.sun.faban.driver.DriverContext {
             throw new IllegalStateException("DriverContext.pauseTime called outside an operation");
         }
         if (agentThread.driverConfig.operations[agentThread.currentOperation].getTiming() != Timing.MANUAL) {
-            String msg = "Driver: " + getDriverName() + ", Operation: " +
-                    getCurrentOperation() + ", timing: MANUAL illegal call " +
-                    "to pauseTime() in driver code.";
+            String msg = String.format("Driver: %s, Operation: %s, timing: MANUAL illegal call to pauseTime() in driver code.",
+                                       getDriverName(), getCurrentOperation());
             logger.severe(msg);
             IllegalStateException e = new IllegalStateException(msg);
             logger.throwing(className, "recordTime", e);
             throw e;
         }
-        if (timingInfo.lastRespondTime == TIME_NOT_SET) {
-            timingInfo.lastRespondTime = System.nanoTime();
+        if (!timingInfo.hasLastRespondTime()) {
+            timingInfo.setLastRespondTime(System.nanoTime());
 		}
     }
 
@@ -586,39 +584,40 @@ public class DriverContext extends com.sun.faban.driver.DriverContext {
     public long recordStartTime() {
         // Not in an operation, don't record time.
         if (agentThread.currentOperation == -1) {
-            return TIME_NOT_SET;
+            return TimingInfo.TIME_NOT_SET;
         }
         if (timingInfo != null && agentThread.driverConfig.operations[agentThread.currentOperation].getTiming() == Timing.AUTO) {
-            if (timingInfo.invokeTime == TIME_NOT_SET) {
-                if (timingInfo.respondTime != TIME_NOT_SET) {
+            if (!timingInfo.hasInvokeTime()) {
+                if (timingInfo.hasRespondTime()) {
                     logger.warning("Respond time already set before sleeping. Please report a bug.");
                 }
-                timer.wakeupAt(timingInfo.intendedInvokeTime);
+                timer.wakeupAt(timingInfo.getIntendedInvokeTime());
                 // But since sleep may not be exact, we get the time again here.
-                timingInfo.invokeTime = System.nanoTime();
-                return timingInfo.invokeTime;
+                timingInfo.setInvokeTime(System.nanoTime());
+                return timingInfo.getInvokeTime();
             }
-            else if (pauseSupported && timingInfo.respondTime != TIME_NOT_SET) {
-                if (timingInfo.respondTime < timingInfo.invokeTime) {
-                    logger.warning("Respond time (" + timingInfo.respondTime + ") less than invoke time (" + timingInfo.invokeTime + "). Please report a bug.");
+            else if (pauseSupported && timingInfo.hasRespondTime()) {
+                if (timingInfo.getRespondTime() < timingInfo.getInvokeTime()) {
+                    logger.warning(String.format("Respond time (%d) less than invoke time (%d). Please report a bug.",
+                                                 timingInfo.getRespondTime(), timingInfo.getInvokeTime()));
                 }
 
                 // Some response already read, then transmit again.
                 // In this case the time from last receive to this transmit
                 // is the pause time ...
-                timingInfo.lastRespondTime = timingInfo.respondTime;
+                timingInfo.setLastRespondTime(timingInfo.getRespondTime());
 
                 // We set the pause time only on the first byte transmitted.
-                timingInfo.respondTime = TIME_NOT_SET;
+                timingInfo.clearRespondTime();
 
                 long time = System.nanoTime();
-                timingInfo.pauseTime += time - timingInfo.lastRespondTime;
+                timingInfo.setPauseTime(timingInfo.getPauseTime() + time - timingInfo.getLastRespondTime());
                 return time;
             }
             // Otherwise this can be a subsequent write.
             // Invoke time already set and respond time not set.
         }
-        return TIME_NOT_SET;
+        return TimingInfo.TIME_NOT_SET;
     }
 
     /**
@@ -628,22 +627,24 @@ public class DriverContext extends com.sun.faban.driver.DriverContext {
      * @return The recorded time - system nanotime, or TIME_NOT_SET if not set
      */
     public long recordEndTime() {
-        long tstamp = TIME_NOT_SET;
+        long tstamp = TimingInfo.TIME_NOT_SET;
         // Not in an operation, don't record time.
         if (agentThread.currentOperation != -1) {
             if (timingInfo != null && agentThread.driverConfig.operations[agentThread.currentOperation].getTiming() == Timing.AUTO ) {
                 // Some stacks clear the connection by doing a read before a
                 // write in a request, normally a read of 0 bytes. We need to
                 // make sure such reads are not part of the response time.
-                if (timingInfo.invokeTime == TIME_NOT_SET) {
+                if (!timingInfo.hasInvokeTime()) {
                     int[] previousOps = agentThread.previousOperation;
                     String name = agentThread.driverConfig.mix[0].operations[previousOps[0]].getName();
-                    if (previousOps.length > 1)
+                    if (previousOps.length > 1) {
                         name += ',' + agentThread.driverConfig.mix[1].operations[previousOps[1]].getName();
+                    }
                     logger.warning("Read before write! Some input may still be in the buffer from previous operation " + name + ". Ignoring such input.");
                 }
                 else {
-                    timingInfo.respondTime = tstamp = System.nanoTime();
+                    tstamp = System.nanoTime();
+                    timingInfo.setRespondTime(tstamp);
                 }
             }
         }
@@ -658,34 +659,12 @@ public class DriverContext extends com.sun.faban.driver.DriverContext {
     void setInvokeTime(long time) {
 
         // Then set the intended start time.
-        timingInfo.intendedInvokeTime = time;
+        timingInfo.setIntendedInvokeTime(time);
         // And set the other times to invalid.
-        timingInfo.invokeTime = TIME_NOT_SET;
-        timingInfo.respondTime = TIME_NOT_SET;
-        timingInfo.lastRespondTime = TIME_NOT_SET;
-        timingInfo.pauseTime = 0l;
-    }
-
-    /**
-     * TimingInfo is a value object that contains individual
-     * timing records for each operation.
-     */
-    public static class TimingInfo {
-
-    	/** Intended Invoke Time. */
-        public long intendedInvokeTime = TIME_NOT_SET;
-
-        /** Actual Invoke Time. */
-        public long invokeTime = TIME_NOT_SET;
-
-        /** Respond Time. */
-        public long respondTime = TIME_NOT_SET;
-
-        /** Last respond time, if any. */
-        public long lastRespondTime = TIME_NOT_SET;
-
-        /** Pause Time. */
-        public long pauseTime = 0l;
+        timingInfo.clearInvokeTime();
+        timingInfo.clearRespondTime();
+        timingInfo.clearLastRespondTime();
+        timingInfo.clearPauseTime();
     }
 
     /**

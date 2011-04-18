@@ -74,4 +74,8 @@ public @interface BenchmarkDriver {
      * The time unit used for reporting response times.
      */
     TimeUnit responseTimeUnit() default TimeUnit.SECONDS;
+    /**
+     * The time unit used for reporting histogram.
+     */
+    TimeUnit histogramTimeUnit() default TimeUnit.SECONDS;
 }

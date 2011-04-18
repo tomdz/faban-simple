@@ -68,14 +68,14 @@ public class CycleThread extends AgentThread {
 
         try {
             driver = driverClass.newInstance();
-        } catch (Throwable t) {
+        }
+        catch (Throwable t) {
             Throwable cause = t.getCause();
             while (cause != null) {
                 t = cause;
                 cause = t.getCause();
             }
-            logger.log(Level.SEVERE, name +
-                    ": Error initializing driver object.", t);
+            logger.log(Level.SEVERE, name + ": Error initializing driver object.", t);
             agent.abortRun();
             return; // Terminate this thread immediately
         }
@@ -112,8 +112,7 @@ public class CycleThread extends AgentThread {
 
             // Select the operation
             currentOperation = selector[0].select();
-            Operation op =
-                    driverConfig.operations[currentOperation];
+            Operation op = driverConfig.operations[currentOperation];
 
             driverContext.setInvokeTime(getInvokeTime(previousOp, mixId));
 
@@ -124,7 +123,8 @@ public class CycleThread extends AgentThread {
                 checkRamp();
                 metrics.recordTx();
                 metrics.recordDelayTime();
-            } catch (InvocationTargetException e) {
+            }
+            catch (InvocationTargetException e) {
                 // An invocation target exception is caused by another
                 // exception thrown by the operation directly.
                 Throwable cause = e.getCause();
@@ -138,46 +138,48 @@ public class CycleThread extends AgentThread {
 
                 // In case of exception, invokeTime or even respondTime may
                 // still be -1.
-                DriverContext.TimingInfo timingInfo = driverContext.timingInfo;
+                TimingInfo timingInfo = driverContext.timingInfo;
 
                 // The lastRespondTime may be set, though. if so, propagate
                 // it back to respondTime.
-                if (timingInfo.respondTime == TIME_NOT_SET &&
-                    timingInfo.lastRespondTime != TIME_NOT_SET) {
+                if (!timingInfo.hasRespondTime() && timingInfo.hasLastRespondTime()) {
                     logger.fine("Potential open request in operation " + op.getMethod().getName() + ".");
-                    timingInfo.respondTime = timingInfo.lastRespondTime;
+                    timingInfo.setRespondTime(timingInfo.getLastRespondTime());
                 }
 
                 // If it never waited, we'll see whether we can just use the
                 // previous start and end times.
-                if (timingInfo.invokeTime == TIME_NOT_SET) {
+                if (!timingInfo.hasInvokeTime()) {
                     long currentTime = System.nanoTime();
-                    if (currentTime < timingInfo.intendedInvokeTime) {
-                        timingInfo.invokeTime = startTime[mixId];
-                        timingInfo.respondTime = endTime[mixId];
-                    } else {
+                    if (currentTime < timingInfo.getIntendedInvokeTime()) {
+                        timingInfo.setInvokeTime(startTime[mixId]);
+                        timingInfo.setRespondTime(endTime[mixId]);
+                    }
+                    else {
                         // Too late, we'll need to use the real time
                         // for both invoke and respond time.
-                        timingInfo.invokeTime = System.nanoTime();
-                        timingInfo.respondTime = timingInfo.invokeTime;
+                        timingInfo.setInvokeTime(System.nanoTime());
+                        timingInfo.setRespondTime(timingInfo.getInvokeTime());
                         // The delay time is invalid,
                         // we cannot record in this case.
                     }
-                } else if (timingInfo.respondTime == TIME_NOT_SET) {
-                    timingInfo.respondTime = timingInfo.invokeTime;
-                    metrics.recordDelayTime();
-                } else {
+                }
+                else if (!timingInfo.hasRespondTime()) {
+                    timingInfo.setRespondTime(timingInfo.getInvokeTime());
                     metrics.recordDelayTime();
                 }
-            } catch (IllegalAccessException e) {
-                logger.log(Level.SEVERE, name + "." + op.getMethod().getName() + ": "
-                        + e.getMessage(), e);
+                else {
+                    metrics.recordDelayTime();
+                }
+            }
+            catch (IllegalAccessException e) {
+                logger.log(Level.SEVERE, String.format("%s.%s: %s", name, op.getMethod().getName(), e.getMessage()), e);
                 agent.abortRun();
                 return;
             }
 
-            startTime[mixId] = driverContext.timingInfo.invokeTime;
-            endTime[mixId] = driverContext.timingInfo.respondTime;
+            startTime[mixId] = driverContext.timingInfo.getInvokeTime();
+            endTime[mixId] = driverContext.timingInfo.getRespondTime();
 
             if (cycleCount > endRampDown) {
 				break driverLoop;
@@ -200,8 +202,8 @@ public class CycleThread extends AgentThread {
         // Copy out cycle count so we do not alternate it here.
         // Remember, this method is controlled by the user-implemented
         // driver through the context.
-        int cycleCount = this.cycleCount;
-        ++cycleCount;
+        int cycleCount = this.cycleCount + 1;
+
         if (cycleCount > endRampUp && cycleCount <= endStdyState) {
 			return true;
 		}
@@ -230,24 +232,25 @@ public class CycleThread extends AgentThread {
         // flag is only set once the start time has reached. Unlike time runs
         // without simultaneous starts where the startTimeSet is set to true
         // once the start time is actually set.
-        if (!runInfo.simultaneousStart && !startTimeSet &&
-                agent.timeSetLatch.getCount() == 0) {
-            long invoke = driverContext.timingInfo.invokeTime;
+        if (!runInfo.simultaneousStart && !startTimeSet && agent.timeSetLatch.getCount() == 0) {
+            long invoke = driverContext.timingInfo.getInvokeTime();
             if (invoke >= agent.startTime) {
                 ++cycleCount; // Count this tx which started after bench start.
                 startTimeSet = true;
                 inRamp = true;
-            } else if (invoke == -1 &&
-                    System.nanoTime() >= agent.startTime) {
+            }
+            else if (invoke == -1 && System.nanoTime() >= agent.startTime) {
                 // We need to set the start time as time has come.
                 startTimeSet = true;
                 inRamp = true;
             }
-        } else if (startTimeSet) { // Cycle where start time set not counted.
+        }
+        else if (startTimeSet) { // Cycle where start time set not counted.
             ++cycleCount;
             if (cycleCount > endRampUp && cycleCount <= endStdyState) {
 				inRamp = false;
-			} else {
+			}
+            else {
 				inRamp = true;
 			}
         }

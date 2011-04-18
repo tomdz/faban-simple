@@ -305,11 +305,10 @@ public class Metrics implements Serializable, Cloneable,
         // The actual run configuration is used in case it represents time.
         // This prevents us from over-allocating the thruput histogram.
         if (driverConfig.runControl == RunControl.TIME) {
-			graphBuckets = 1 + (runInfo.rampUp + runInfo.stdyState +
-                    runInfo.rampDown) / driverConfig.graphInterval;
-		} else {
-			graphBuckets = (int) Math.ceil(3600d * // Convert hr => s
-                    runInfo.maxRunTime / driverConfig.graphInterval);
+			graphBuckets = 1 + (runInfo.rampUp + runInfo.stdyState + runInfo.rampDown) / driverConfig.graphInterval;
+		}
+        else {
+			graphBuckets = (int) Math.ceil(3600d * runInfo.maxRunTime / driverConfig.graphInterval); // Convert hr => s
 		}
 
         // Convert to ns.
@@ -325,8 +324,7 @@ public class Metrics implements Serializable, Cloneable,
         coarseRespBucketSize = fineRespBucketSize * RESPBUCKET_SIZE_RATIO;
 
         // The last coarse response bucket is used for overflow.
-        coarseRespHistMax = coarseRespBucketSize * (COARSE_RESPBUCKETS - 1) +
-                                                    fineRespHistMax;
+        coarseRespHistMax = coarseRespBucketSize * (COARSE_RESPBUCKETS - 1) + fineRespHistMax;
 
         double delayHistMax = driverConfig.operations[0].getCycle().getHistogramMax();
 
@@ -350,29 +348,26 @@ public class Metrics implements Serializable, Cloneable,
 		}
 
         int txType = thread.currentOperation;
-        DriverContext.TimingInfo timingInfo =
-                thread.driverContext.timingInfo;
-        endTimeNanos = timingInfo.respondTime;
-        long responseTime = endTimeNanos - timingInfo.invokeTime -
-                           timingInfo.pauseTime;
+        TimingInfo timingInfo = thread.driverContext.timingInfo;
+        endTimeNanos = timingInfo.getRespondTime();
+        long responseTime = endTimeNanos - timingInfo.getInvokeTime() - timingInfo.getPauseTime();
         if (responseTime < 0) {
-            thread.logger.warning(thread.name +
-                    ":Pause time too large - invoke : " +
-                    timingInfo.invokeTime + ", respond : " + endTimeNanos +
-                    ", pause : " + timingInfo.pauseTime);
-            responseTime = 0; // Set it to 0 in this case so it does not
-                              // destroy the whole run.
+            thread.logger.warning(String.format("%s:Pause time too large - invoke : %d, respond : %d, pause : %d",
+                                                thread.name, timingInfo.getInvokeTime(), endTimeNanos, timingInfo.getPauseTime()));
+            responseTime = 0; // Set it to 0 in this case so it does not destroy the whole run.
         }
 
         long elapsedTime = Long.MIN_VALUE;
-        if (thread.agent.startTime != Long.MIN_VALUE)
+        if (thread.agent.startTime != Long.MIN_VALUE) {
             elapsedTime = endTimeNanos - thread.agent.startTime;
+        }
 
-        if(elapsedTime > 0l) {
+        if (elapsedTime > 0l) {
             if ((elapsedTime / graphBucketSize) >= graphBuckets) {
                 thruputGraph[txType][graphBuckets - 1]++;
                 respGraph[txType][graphBuckets - 1] += responseTime;
-            } else {
+            }
+            else {
                 int bucket = (int) (elapsedTime / graphBucketSize);
                 thruputGraph[txType][bucket]++;
                 respGraph[txType][bucket] += responseTime;
@@ -381,23 +376,22 @@ public class Metrics implements Serializable, Cloneable,
 
         txCntTotal[txType]++;
         respSumTotal[txType] += responseTime;
-        sumSquaresTotal[txType] = addSumSquare(sumSquaresTotal[txType], 
-                txCntTotal[txType], respSumTotal[txType], responseTime);
+        sumSquaresTotal[txType] = addSumSquare(sumSquaresTotal[txType], txCntTotal[txType], respSumTotal[txType], responseTime);
 
         if (!thread.inRamp) {
             txCntStdy[txType]++;
             respSumStdy[txType] += responseTime;
-            sumSquaresStdy[txType] = addSumSquare(sumSquaresStdy[txType],
-                txCntStdy[txType], respSumStdy[txType], responseTime);
+            sumSquaresStdy[txType] = addSumSquare(sumSquaresStdy[txType], txCntStdy[txType], respSumStdy[txType], responseTime);
 
             // post in histogram of response times
             int bucket;
             if (responseTime < fineRespHistMax) {
                 bucket = (int) (responseTime / fineRespBucketSize);
-            } else if (responseTime < coarseRespHistMax) {
-                bucket = (int) (((responseTime - fineRespHistMax) /
-                        coarseRespBucketSize) + FINE_RESPBUCKETS);
-            } else {
+            }
+            else if (responseTime < coarseRespHistMax) {
+                bucket = (int) (((responseTime - fineRespHistMax) / coarseRespBucketSize) + FINE_RESPBUCKETS);
+            }
+            else {
                 bucket = RESPBUCKETS - 1;
                 hiRespSumStdy[txType] += responseTime;
             }
@@ -426,9 +420,9 @@ public class Metrics implements Serializable, Cloneable,
             errCntStdy[txType]++;
 		}
 
-        if (thread.driverContext.timingInfo.respondTime !=
-                AgentThread.TIME_NOT_SET)
-            endTimeNanos = thread.driverContext.timingInfo.respondTime;
+        if (thread.driverContext.timingInfo.hasRespondTime()) {
+            endTimeNanos = thread.driverContext.timingInfo.getRespondTime();
+        }
     }
 
     /**
@@ -442,16 +436,13 @@ public class Metrics implements Serializable, Cloneable,
             return;
 		}
 
-        DriverContext.TimingInfo timingInfo =
-                thread.driverContext.timingInfo;
+        TimingInfo timingInfo = thread.driverContext.timingInfo;
 
         long actualDelayTime = -1l;
         long actualCycleTime = -1l;
 
-        if (thread.isSteadyState(thread.startTime[thread.mixId],
-                                 timingInfo.invokeTime)) {
-            actualCycleTime = timingInfo.invokeTime -
-                              thread.startTime[thread.mixId];
+        if (thread.isSteadyState(thread.startTime[thread.mixId], timingInfo.getInvokeTime())) {
+            actualCycleTime = timingInfo.getInvokeTime() - thread.startTime[thread.mixId];
 		}
 
         CycleType cycleType = RunInfo.getInstance().driverConfig.operations[thread.currentOperation].getCycle().cycleType;
@@ -461,10 +452,8 @@ public class Metrics implements Serializable, Cloneable,
                 break;
             case THINKTIME :
                 if (thread.endTime[thread.mixId] >= 0) {// Normal
-                    if (thread.isSteadyState(thread.endTime[thread.mixId],
-                                             timingInfo.invokeTime)) {
-                        actualDelayTime = timingInfo.invokeTime -
-                                thread.endTime[thread.mixId];
+                    if (thread.isSteadyState(thread.endTime[thread.mixId], timingInfo.getInvokeTime())) {
+                        actualDelayTime = timingInfo.getInvokeTime() - thread.endTime[thread.mixId];
 					}
                 }
                 else { // Exceptions occurred, no respond time available
@@ -474,9 +463,9 @@ public class Metrics implements Serializable, Cloneable,
         }
 
         if (thread.mixId == 0 && actualCycleTime >= 0) {
-        // cycleSum is for little's law verification.
-        // We do not count background cycles to the cycleSum or the
-        // verification will be totally off.
+            // cycleSum is for little's law verification.
+            // We do not count background cycles to the cycleSum or the
+            // verification will be totally off.
             cycleSum += actualCycleTime;
 		}
 
@@ -499,13 +488,15 @@ public class Metrics implements Serializable, Cloneable,
         long bucket = actualDelayTime / delayBucketSize;
         if (bucket >= DELAYBUCKETS) {
             delayHist[txType][DELAYBUCKETS - 1]++;
-		} else {
+		}
+        else {
             delayHist[txType][(int) bucket]++;
 		}
         bucket = thread.delayTime[thread.mixId] / delayBucketSize;
         if (bucket >= DELAYBUCKETS) {
             targetedDelayHist[txType][DELAYBUCKETS - 1]++;
-		} else {
+		}
+        else {
             targetedDelayHist[txType][(int) bucket]++;
         }
     }
@@ -526,26 +517,23 @@ public class Metrics implements Serializable, Cloneable,
      */
 	public void add(Metrics s) {
         // Check whether the host is the same. If not, set host to null
-        if (host != null && !host.equals(s.host))
+        if (host != null && !host.equals(s.host)) {
             host = null;
+        }
 
         // Add up the thread count
 		threadCnt += s.threadCnt;
 
         Logger logger = Logger.getLogger(getClass().getName());
-        logger.finest("Adding cycleSum " + cycleSum + " and " + s.cycleSum);
+        logger.finest(String.format("Adding cycleSum %d and %d", cycleSum, s.cycleSum));
 
         cycleSum += s.cycleSum;
         // Standard statistics
 		for (int i = 0; i < txTypes; i++) {
             // Add the sum squares before adding the count and response sum.
             // The values of count and sum have to be unchanged at this point.
-            sumSquaresStdy[i] = addSumSquare(
-                    sumSquaresStdy[i], txCntStdy[i], respSumStdy[i],
-                    s.sumSquaresStdy[i], s.txCntStdy[i], s.respSumStdy[i]);
-            sumSquaresTotal[i] = addSumSquare(
-                    sumSquaresTotal[i], txCntTotal[i], respSumTotal[i],
-                    s.sumSquaresTotal[i], s.txCntTotal[i], s.respSumTotal[i]);
+            sumSquaresStdy[i] = addSumSquare(sumSquaresStdy[i], txCntStdy[i], respSumStdy[i], s.sumSquaresStdy[i], s.txCntStdy[i], s.respSumStdy[i]);
+            sumSquaresTotal[i] = addSumSquare(sumSquaresTotal[i], txCntTotal[i], respSumTotal[i], s.sumSquaresTotal[i], s.txCntTotal[i], s.respSumTotal[i]);
 			txCntStdy[i] += s.txCntStdy[i];
             txCntTotal[i] += s.txCntTotal[i];
             errCntStdy[i] += s.errCntStdy[i];
@@ -594,15 +582,16 @@ public class Metrics implements Serializable, Cloneable,
         // Aggregate the attached CustomMetrics.
         if (metricAttachments == null) {
             metricAttachments = s.metricAttachments;
-        } else if (s.metricAttachments != null) {
-            Set<Map.Entry<String, CustomMetrics>> entries =
-                    s.metricAttachments.entrySet();
+        }
+        else if (s.metricAttachments != null) {
+            Set<Map.Entry<String, CustomMetrics>> entries = s.metricAttachments.entrySet();
             for (Map.Entry<String, CustomMetrics> entry : entries) {
                 String key = entry.getKey();
                 if (metricAttachments.containsKey(key)) {
                     CustomMetrics m = metricAttachments.get(key);
                     m.add(entry.getValue());
-                } else {
+                }
+                else {
                     metricAttachments.put(key, entry.getValue());
                 }
             }
@@ -611,15 +600,16 @@ public class Metrics implements Serializable, Cloneable,
         // Aggregate the attached CustomTableMetrics.
         if (tableAttachments == null) {
             tableAttachments = s.tableAttachments;
-        } else if (s.tableAttachments != null) {
-            Set<Map.Entry<String, CustomTableMetrics>> entries =
-                    s.tableAttachments.entrySet();
+        }
+        else if (s.tableAttachments != null) {
+            Set<Map.Entry<String, CustomTableMetrics>> entries = s.tableAttachments.entrySet();
             for (Map.Entry<String, CustomTableMetrics> entry : entries) {
                 String key = entry.getKey();
                 if (tableAttachments.containsKey(key)) {
                     CustomTableMetrics m = tableAttachments.get(key);
                     m.add(entry.getValue());
-                } else {
+                }
+                else {
                     tableAttachments.put(key, entry.getValue());
                 }
             }
@@ -643,11 +633,9 @@ public class Metrics implements Serializable, Cloneable,
             s = s + y * y / (n * (double) (n - 1));
         }
         if (s < 0) {
-            Logger.getLogger(Metrics.class.getName()).log(Level.WARNING,
-                        "Doug - addSumSquare(s=" + s0 + ", n=" + n + ", t=" +
-                        t + ", x=" + x + ") returns NEGATIVE "+ s + " ",
-                        new Exception());
-            }
+            Logger.getLogger(Metrics.class.getName())
+                  .log(Level.WARNING, String.format("Doug - addSumSquare(s=%f, n=%f, t=%f, x=%f) returns NEGATIVE %s ", s0, n, t, x, s), new Exception());
+        }
         return s;
     }
 
@@ -669,44 +657,49 @@ public class Metrics implements Serializable, Cloneable,
      * @param t2 The sum (total) of the second sample set
      * @return The aggregated sum square of the sample sets
      */
-    static double addSumSquare(double s1, int n1, double t1,
-                               double s2, int n2, double t2) {
+    static double addSumSquare(double s1, int n1, double t1, double s2, int n2, double t2) {
         
         // We have to account for adding zero and one occurence, too.
         double s;
         if (n2 == 0) {
             s = s1;
-        } else if (n1 == 0) {
+        }
+        else if (n1 == 0) {
             s = s2;
-        } else if (n2 == 1) {
+        }
+        else if (n2 == 1) {
             s = addSumSquare(s1, n1, t1, t2);
-        } else if (n1 == 1) {
+        }
+        else if (n1 == 1) {
             s = addSumSquare(s2, n2, t2, t1);
-        } else {
+        }
+        else {
             s = (n2 / (double) n1) * t1 - t2;
             s = s1 + s2 + (n1 / (n2 * ((double) n1 + n2))) * s * s;
             if (s < 0) {
-                Logger.getLogger(Metrics.class.getName()).warning(
-                        "Doug - addSumSquare(s1=" + s1 + ", n1=" + n1 +
-                        ", t1=" + t1 + ", s2=" + s2 + ", n2=" + n2 + ", t2=" +
-                        t2 + ") returns NEGATIVE " + s +
-                        "\nn2 / (double) n1 = " + (n2 / (double) n1) +
-                        "\n(n2 / (double) n1) * t1 = " + ((n2 / (double) n1) * t1) +
-                        "\n(n2 / (double) n1) * t1 - t2 = " + ((n2 / (double) n1) * t1 - t2) +
-                        "\ns1 + s2 = " + (s1 + s2) +
-                        "\n(double) n1 + n2 = " + ((double) n1 + n2) +
-                        "\nn2 * ((double) n1 + n2) = " + (n2 * ((double) n1 + n2)) +
-                        "\nn1 / (n2 * ((double) n1 + n2)) = " + (n1 / (n2 * ((double) n1 + n2))) +
-                        "\n(n1 / (n2 * ((double) n1 + n2))) * s = " + ((n1 / (n2 * ((double) n1 + n2))) * s) +
-                        "\n(n1 / (n2 * ((double) n1 + n2))) * s * s = " + ((n1 / (n2 * ((double) n1 + n2))) * s * s) +
-                        "\ns1 + s2 + (n1 / (n2 * ((double) n1 + n2))) * s * s = " + (s1 + s2 + (n1 / (n2 * ((double) n1 + n2))) * s * s)
+                Logger.getLogger(Metrics.class.getName())
+                      .warning(String.format("Doug - addSumSquare(s1=%f, n1=%f, t1=%f, s2=%f, n2=%f, t2=%f returns NEGATIVE %d\n" +
+                                             "n2 / (double) n1 = %f\n" +
+                                             "(n2 / (double) n1) * t1 = %f\n" +
+                                             "(n2 / (double) n1) * t1 - t2 = %f\n" +
+                                             "s1 + s2 = %f\n" +
+                                             "(double) n1 + n2 = %f\n" +
+                                             "n2 * ((double) n1 + n2) = %f\n" +
+                                             "n1 / (n2 * ((double) n1 + n2)) = %f\n" +
+                                             "(n1 / (n2 * ((double) n1 + n2))) * s = %f\n" +
+                                             "(n1 / (n2 * ((double) n1 + n2))) * s * s = %f\n" +
+                                             "s1 + s2 + (n1 / (n2 * ((double) n1 + n2))) * s * s = %f",
+                                             s1, n1, t1, s2, n2, t2, s,
+                                             (n2 / (double) n1), ((n2 / (double) n1) * t1), ((n2 / (double) n1) * t1 - t2), (s1 + s2),
+                                             ((double) n1 + n2), (n2 * ((double) n1 + n2)), (n1 / (n2 * ((double) n1 + n2))),
+                                             ((n1 / (n2 * ((double) n1 + n2))) * s), ((n1 / (n2 * ((double) n1 + n2))) * s * s),
+                                             (s1 + s2 + (n1 / (n2 * ((double) n1 + n2))) * s * s))
                 );
             }
         }
         if (Double.isNaN(s)) {
-            Logger.getLogger(Metrics.class.getName()).
-                    warning("addSumSquare(" + s1 + ", " + n1 + ", " + t1 +
-                    ", " + s2 + ", " + n2 + ", " + t2 + ") returns NaN");
+            Logger.getLogger(Metrics.class.getName())
+                  .warning(String.format("addSumSquare(%f, %f, %f, %f, %f, %f) returns NaN", s1, n1, t1, s2, n2, t2));
         }
         return s;
     }
@@ -727,8 +720,7 @@ public class Metrics implements Serializable, Cloneable,
      * @param t1 The sum (total) of the full sample
      * @return The difference of the sum sum square
      */
-    static double subtractSumSquare(double s, int n, double t,
-            double s1, int n1, double t1) {
+    static double subtractSumSquare(double s, int n, double t, double s1, int n1, double t1) {
         Logger logger = Logger.getLogger(Metrics.class.getName());
         double s2;
         int n2 = n - n1;
@@ -1548,22 +1540,21 @@ public class Metrics implements Serializable, Cloneable,
         // If all buckets are used, the last one does not get extrapolated
         // as it has the data of that bucket and beyond.
         boolean spareLastBucket = false;
-        if (limit == respHist[0].length)
+        if (limit == respHist[0].length) {
             spareLastBucket = true;
+        }
 
         if (limit > FINE_RESPBUCKETS) {
             int size;
             if (spareLastBucket) {
                 --limit;
-                size = (COARSE_RESPBUCKETS - 1) * RESPBUCKET_SIZE_RATIO +
-                                                        FINE_RESPBUCKETS + 1;
-            } else {
-                size = (limit - FINE_RESPBUCKETS) * RESPBUCKET_SIZE_RATIO +
-                                                        FINE_RESPBUCKETS;
+                size = (COARSE_RESPBUCKETS - 1) * RESPBUCKET_SIZE_RATIO + FINE_RESPBUCKETS + 1;
+            }
+            else {
+                size = (limit - FINE_RESPBUCKETS) * RESPBUCKET_SIZE_RATIO + FINE_RESPBUCKETS;
             }
             int[][] respHist = new int[txTypes][size];
             for (int i = 0; i < txTypes; i++) {
-
                 // Copy the fine buckets unchanged.
                 System.arraycopy(this.respHist[i], 0, respHist[i], 0,
                                  FINE_RESPBUCKETS);
@@ -1573,20 +1564,22 @@ public class Metrics implements Serializable, Cloneable,
                     // Spread the count among all 10 flat buckets.
                     int base = count / RESPBUCKET_SIZE_RATIO;
                     int remainder = count % RESPBUCKET_SIZE_RATIO;
-                    int baseIdx = (j - FINE_RESPBUCKETS) *
-                                    RESPBUCKET_SIZE_RATIO + FINE_RESPBUCKETS;
+                    int baseIdx = (j - FINE_RESPBUCKETS) * RESPBUCKET_SIZE_RATIO + FINE_RESPBUCKETS;
                     int k = 9;
                     // The higher buckets get the base
-                    for (; k >= remainder; k--)
+                    for (; k >= remainder; k--) {
                         respHist[i][baseIdx + k] = base;
+                    }
                     // The lower remaining buckets get the base + 1
                     ++base;
-                    for (; k >= 0; k--)
+                    for (; k >= 0; k--) {
                         respHist[i][baseIdx + k] = base;
+                    }
                 }
-                if (spareLastBucket)
+                if (spareLastBucket) {
                     // Just copy the last bucket.
                     respHist[i][size - 1] = this.respHist[i][limit];
+                }
             }
             this.respHist = respHist;
         }
@@ -1599,50 +1592,38 @@ public class Metrics implements Serializable, Cloneable,
     public void printDetail(StringBuilder b)  {
         RunInfo runInfo = RunInfo.getInstance();
         BenchmarkDefinition.Driver driver = runInfo.driverConfigs[driverType];
-        double precision = driver.responseTimeUnit.toNanos(1l);
+        double graphPrecision = driver.responseTimeUnit.toNanos(1l);
+        double histogramPrecision = driver.responseTimeUnit.toNanos(1l);
         double graphBucketSize = this.graphBucketSize / 1e9d;
-        String responseTimeUnit = driver.responseTimeUnit.toString().
-                toLowerCase();
+        String responseTimeUnit = driver.responseTimeUnit.toString().toLowerCase();
+        String histogramTimeUnit = driver.responseTimeUnit.toString().toLowerCase();
 
         flattenRespHist();
 
-        printGraph(b, "Throughput", graphBucketSize,
-                "%.0f", "%.2f", thruputGraph, graphBucketSize);
-
-        printGraph(b, "Response Times (" + responseTimeUnit +
-                ")", graphBucketSize, "%.0f", "%.6f", respGraph,
-                thruputGraph, precision);
-
-        printHistogram(b, "Frequency Distribution of Response Times (" +
-                responseTimeUnit + ")", fineRespBucketSize / precision, "%.5f",
-                respHist);
-
-        printHistogram(b, "Frequency Distribution of Cycle/Think Times " +
-                "(seconds)", delayBucketSize / 1e9d, "%.3f", delayHist);
-
-        printHistogram(b, "Frequency Distribution of Targeted Cycle/Think " +
-                "Times (seconds)", delayBucketSize / 1e9d, "%.3f",
-                targetedDelayHist);
+        printGraph(b, "Throughput", graphBucketSize, "%.0f", "%.2f", thruputGraph, graphBucketSize);
+        printGraph(b, String.format("Response Times (%s)", responseTimeUnit), graphBucketSize, "%.0f", "%.6f", respGraph, thruputGraph, graphPrecision);
+        printHistogram(b, String.format("Frequency Distribution of Response Times (%s)", responseTimeUnit), fineRespBucketSize / graphPrecision, "%.6f", respHist);
+        printHistogram(b, String.format("Frequency Distribution of Cycle/Think Times (%s)", histogramTimeUnit), delayBucketSize / histogramPrecision, "%.6f", delayHist);
+        printHistogram(b, String.format("Frequency Distribution of Targeted Cycle/Think Times (%s)", histogramTimeUnit), delayBucketSize / histogramPrecision, "%.6f", targetedDelayHist);
     }
 
     @SuppressWarnings("boxing")
-    private void printGraph(StringBuilder b, String label, double unit,
-                            String unitFormat, String dataFormat,
-                            int[][] rawGraph, double divider) {
-
+    private void printGraph(StringBuilder b, String label, double unit, String unitFormat, String dataFormat, int[][] rawGraph, double divider) {
         int bucketLimit = rawGraph[0].length;
 
         // Check the histogram and do not output unused buckets if needed.
         // The graph buckets are sized according to the run time.
         // So we'll scan only if the run is cycleControl.
-        if (RunInfo.getInstance().driverConfigs[driverType].
-                runControl == RunControl.CYCLES) {
+        if (RunInfo.getInstance().driverConfigs[driverType].runControl == RunControl.CYCLES) {
             bucketLimit = getBucketLimit(rawGraph);
 		}
 
         // Data header
-        b.append("Section: ").append(driverName).append(' ').append(label).
-                append('\n');
+        b.append("Section: ");
+        b.append(driverName);
+        b.append(' ');
+        b.append(label);
+        b.append('\n');
         b.append("Display: Line\n");
 
         TextTable table = new TextTable(bucketLimit, txTypes + 1);
@@ -1660,8 +1641,7 @@ public class Metrics implements Serializable, Cloneable,
 
             // The data
             for (int j = 0; j < txTypes; j++) {
-                table.setField(i, j + 1,
-                        String.format(dataFormat, rawGraph[j][i]/divider));
+                table.setField(i, j + 1, String.format(dataFormat, rawGraph[j][i]/divider));
             }
         }
         table.format(b);
@@ -1669,23 +1649,22 @@ public class Metrics implements Serializable, Cloneable,
     }
 
     @SuppressWarnings("boxing")
-    private void printGraph(StringBuilder b, String label, double unit,
-                            String unitFormat, String dataFormat,
-                            long[][] rawGraph, int[][] divider, double divider2){
-
+    private void printGraph(StringBuilder b, String label, double unit, String unitFormat, String dataFormat, long[][] rawGraph, int[][] divider, double divider2){
         int bucketLimit = rawGraph[0].length;
 
         // Check the histogram and do not output unused buckets if needed.
         // The graph buckets are sized according to the run time.
         // So we'll scan only if the run is cycleControl.
-        if (RunInfo.getInstance().driverConfigs[driverType].
-                runControl == RunControl.CYCLES) {
+        if (RunInfo.getInstance().driverConfigs[driverType].runControl == RunControl.CYCLES) {
             bucketLimit = getBucketLimit(rawGraph);
 		}
 
         // Data header
-        b.append("Section: ").append(driverName).append(' ').append(label).
-                append('\n');
+        b.append("Section: ");
+        b.append(driverName);
+        b.append(' ');
+        b.append(label);
+        b.append('\n');
         b.append("Display: Line\n");
 
         TextTable table = new TextTable(bucketLimit, txTypes + 1);
@@ -1715,15 +1694,16 @@ public class Metrics implements Serializable, Cloneable,
     }
 
     @SuppressWarnings("boxing")
-    private void printHistogram(StringBuilder b, String label, double unit,
-                                String unitFormat, int[][] histogram) {
-
+    private void printHistogram(StringBuilder b, String label, double unit, String unitFormat, int[][] histogram) {
         // First, check the histogram and do not output unused buckets.
         int bucketLimit = getBucketLimit(histogram);
 
         // Data header
-        b.append("Section: ").append(driverName).append(' ').append(label).
-                append('\n');
+        b.append("Section: ");
+        b.append(driverName);
+        b.append(' ');
+        b.append(label);
+        b.append('\n');
         b.append("Display: Line\n");
 
         TextTable table = new TextTable(bucketLimit, txTypes + 1);
@@ -1748,7 +1728,7 @@ public class Metrics implements Serializable, Cloneable,
         b.append('\n');
     }
 
-    static StringBuilder space(int space, StringBuilder buffer) {
+    private static StringBuilder space(int space, StringBuilder buffer) {
         for (int i = 0; i < space; i++) {
             buffer.append(' ');
 		}

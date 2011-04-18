@@ -205,6 +205,7 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
             }
 
             def.drivers[i].responseTimeUnit = benchDriver.responseTimeUnit();
+            def.drivers[i].histogramTimeUnit = benchDriver.histogramTimeUnit();
             if (def.drivers[i].responseTimeUnit.equals(TimeUnit.NANOSECONDS)) {
                 throw new DefinitionException("@BenchmarkDriver responseTimeUnit must not be NANOSECONDS");
             }
@@ -232,29 +233,29 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
 			}
 
             // Check the percentile limit on each operation
-            double maxPctLimit = Double.MIN_VALUE;
+            double maxPctLimit = -1.0;
             for (Operation op : def.drivers[i].operations) {
                 if (op.getPercentileLimits().length != def.drivers[i].percentiles.length) {
                     throw new DefinitionException("@BenchmarkOperation %s percentileLimits array must be the same length as @BenchmarkDriver percentiles", op.getName());
                 }
                 for (double limit : op.getPercentileLimits()) {
-                    if (limit > 0d && limit > maxPctLimit) {
+                    if (limit > 0.0 && limit > maxPctLimit) {
                         maxPctLimit = limit;
                     }
                 }
             }
             if (def.drivers[i].percentiles.length > 0) {
-                if (maxPctLimit <= 0d) {
+                if (maxPctLimit <= 0.0) {
                     throw new DefinitionException("At least one percentile limit must be specified.");
                 }
             }
             else { // Old style...
                 for (Operation op : def.drivers[i].operations) {
-                    if (op.getMax90th() > 0d && op.getMax90th()> maxPctLimit) {
+                    if (op.getMax90th() > 0.0 && op.getMax90th()> maxPctLimit) {
                         maxPctLimit = op.getMax90th();
                     }
                 }
-                if (maxPctLimit <= 0d) {
+                if (maxPctLimit <= 0.0) {
                     throw new DefinitionException("At least one max90th must be specified.");
                 }
             }
@@ -683,6 +684,7 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
         String[] pctString;
         String[] pctSuffix;
         TimeUnit responseTimeUnit;
+        TimeUnit histogramTimeUnit;
         Mix[] mix = new Mix[2]; // Foreground (0) and background (1) mix.
         Cycle[] initialDelay = new Cycle[2]; // Foreground and background
         Operation[] operations;

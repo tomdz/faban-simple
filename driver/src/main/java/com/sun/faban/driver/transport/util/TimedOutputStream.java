@@ -22,11 +22,11 @@
 package com.sun.faban.driver.transport.util;
 
 import com.sun.faban.driver.engine.DriverContext;
+import com.sun.faban.driver.engine.TimingInfo;
 
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import static com.sun.faban.driver.engine.AgentThread.TIME_NOT_SET;
 
 /**
  * A pass-through output stream that records the time of the output.
@@ -75,7 +75,7 @@ public class TimedOutputStream extends FilterOutputStream {
         if (ctx != null) {
             isThrottled = throttle.isThrottled(Throttle.UP);
             startWriteAt = ctx.recordStartTime();
-            if (isThrottled && startWriteAt == TIME_NOT_SET)
+            if (isThrottled && startWriteAt == TimingInfo.TIME_NOT_SET)
                 startWriteAt = ctx.getNanoTime();
         }
         super.write(b);
@@ -127,7 +127,7 @@ public class TimedOutputStream extends FilterOutputStream {
 
             // Only take the time if throttling is on and time has
             // not been taken by recordStartTime.
-            if (isThrottled && startWriteAt == TIME_NOT_SET)
+            if (isThrottled && startWriteAt == TimingInfo.TIME_NOT_SET)
                 startWriteAt = System.nanoTime();
         }
         out.write(b, off, len);
