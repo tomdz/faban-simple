@@ -60,20 +60,15 @@ import java.util.logging.Logger;
  * @see com.sun.faban.harness.agent.CmdAgent
  * @see com.sun.faban.harness.engine.CmdService
  */
-public class CmdAgentImpl extends UnicastRemoteObject
-        implements CmdAgent, CommandChecker, Unreferenced {
+public class CmdAgentImpl extends UnicastRemoteObject implements CmdAgent, CommandChecker, Unreferenced {
 
-    private static Logger logger =
-            Logger.getLogger(CmdAgentImpl.class.getName());
+    private static Logger logger = Logger.getLogger(CmdAgentImpl.class.getName());
 
-    private final List<CommandHandle> handleList = Collections.synchronizedList(
-                                                new ArrayList<CommandHandle>());
+    private final List<CommandHandle> handleList = Collections.synchronizedList(new ArrayList<CommandHandle>());
 
-    private static HashMap<String, HashMap<String, List<String>>> servicesBinMap =
-                           new HashMap<String, HashMap<String, List<String>>>();
+    private static HashMap<String, HashMap<String, List<String>>> servicesBinMap = new HashMap<String, HashMap<String, List<String>>>();
 
-    private static HashMap<String, List<String>> servicesClassPath =
-                                            new HashMap<String, List<String>>();
+    private static HashMap<String, List<String>> servicesClassPath = new HashMap<String, List<String>>();
 
     private Timer timer;
 
@@ -128,7 +123,11 @@ public class CmdAgentImpl extends UnicastRemoteObject
      * @return The hostname
      */
     public String getHostName() {
-        return AgentBootstrap.host;
+        return AgentBootstrap.getHostName();
+    }
+
+    public static String getHost() {
+        return AgentBootstrap.getHostName();
     }
 
     /**
@@ -136,7 +135,7 @@ public class CmdAgentImpl extends UnicastRemoteObject
      * @return this Command Agent
      */
     public static CmdAgentImpl getHandle() {
-        return AgentBootstrap.cmd;
+        return AgentBootstrap.getHandle();
     }
 
     /**
@@ -199,7 +198,7 @@ public class CmdAgentImpl extends UnicastRemoteObject
     public void downloadServices(List<String> pathList) {
         for (String path : pathList)  {
             try {
-                new Download().loadService(path, AgentBootstrap.downloadURL);
+                new Download().loadService(path, AgentBootstrap.getDownloadURL());
             } catch (Exception ex) {
                 logger.log(Level.INFO, ex.getMessage() , ex);
             }
@@ -339,7 +338,7 @@ public class CmdAgentImpl extends UnicastRemoteObject
         try {
             Remote agent = (Remote)agentClass.newInstance();
             logger.fine("Agent class " + agent.getClass().getName() + " created");
-            AgentBootstrap.registry.reregister(identifier, agent);
+            AgentBootstrap.getRegistry().reregister(identifier, agent);
             logger.fine("Agent started and Registered as " + identifier);
         }catch(Exception e) {
             logger.log(Level.WARNING, "Failed to create " +
@@ -472,15 +471,7 @@ public class CmdAgentImpl extends UnicastRemoteObject
      * @return Registry
      */
     public static Registry getRegistry() {
-        return AgentBootstrap.registry;
-    }
-
-    /**
-     * Obtains the hostname.
-     * @return hostname
-     */
-    public static String getHost() {
-        return AgentBootstrap.host;
+        return AgentBootstrap.getRegistry();
     }
 
     /**
@@ -488,7 +479,7 @@ public class CmdAgentImpl extends UnicastRemoteObject
      * @return master hostname
      */
     public static String getMaster() {
-        return AgentBootstrap.master;
+        return AgentBootstrap.getMaster();
     }
 
     // Convert command and arguments to use OS-specific paths, if applicable.
@@ -564,7 +555,7 @@ public class CmdAgentImpl extends UnicastRemoteObject
         if (javaCmd == null) { // Initialize javaCmd if needed.
             javaCmd = new ArrayList<String>();
 
-            StringBuilder buf = new StringBuilder(AgentBootstrap.javaHome);
+            StringBuilder buf = new StringBuilder(AgentBootstrap.getJavaHome());
             buf.append(File.separator);
             buf.append("bin");
             buf.append(File.separator);
@@ -572,13 +563,13 @@ public class CmdAgentImpl extends UnicastRemoteObject
             javaCmd.add(buf.toString());
             buf.setLength(0);
 
-            javaCmd.addAll(AgentBootstrap.jvmOptions);
+            javaCmd.addAll(AgentBootstrap.getJvmOptions());
 
             javaCmd.add("-cp");
 
             boolean falseEnding = false;
             // Externally specified classpath takes precedence.
-            for (String pathElement : AgentBootstrap.extClassPath) {
+            for (String pathElement : AgentBootstrap.getExtClassPath()) {
                 buf.append(pathElement);
                 buf.append(File.pathSeparator);
                 falseEnding = true;

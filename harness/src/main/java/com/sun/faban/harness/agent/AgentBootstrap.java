@@ -23,27 +23,36 @@
  */
 package com.sun.faban.harness.agent;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.UnknownHostException;
+import java.rmi.Remote;
+import java.rmi.RemoteException;
+import java.rmi.server.RMISocketFactory;
+import java.rmi.server.UnicastRemoteObject;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.sun.faban.common.Registry;
 import com.sun.faban.common.RegistryLocator;
 import com.sun.faban.common.Utilities;
 import com.sun.faban.harness.common.Config;
 import com.sun.faban.harness.util.CmdMap;
-
-import java.io.*;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.UnknownHostException;
-import java.rmi.RMISecurityManager;
-import java.rmi.Remote;
-import java.rmi.RemoteException;
-import java.rmi.server.RMISocketFactory;
-import java.rmi.server.UnicastRemoteObject;
-import java.util.*;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
-import java.util.logging.LogManager;
-import java.util.logging.Logger;
 
 /**
  * Bootstrap class for the CmdAgent and FileAgent.
@@ -52,60 +61,109 @@ public class AgentBootstrap {
 
     private static int daemonPort = 9981;
 
-    private static Logger logger =
-                            Logger.getLogger(AgentBootstrap.class.getName());
-    static AgentSocketFactory socketFactory;
-    static String progName;
-    static boolean daemon = false;
-    static String host;
-    static String ident;
-    static String master;
-    static Registry registry;
-    static String javaHome;
-    static String downloadURL;
+    private static Logger logger = Logger.getLogger(AgentBootstrap.class.getName());
+    private static AgentSocketFactory socketFactory;
+    private static String progName;
+    private static boolean daemon = false;
+    private static String host;
+    private static String ident;
+    private static String master;
+    private static Registry registry;
+    private static String javaHome;
+    private static String downloadURL;
     // Initialize it to make sure it doesn't end up a 'null'
-    static ArrayList<String> jvmOptions = new ArrayList<String>();
-    static ArrayList<String> extClassPath = new ArrayList<String>();
-    static CmdAgentImpl cmd;
-    static FileAgentImpl file;
-    static final Set<String> registeredNames =
-                    Collections.synchronizedSet(new HashSet<String>());
+    private static ArrayList<String> jvmOptions = new ArrayList<String>();
+    private static ArrayList<String> extClassPath = new ArrayList<String>();
+    private static CmdAgentImpl cmd;
+    private static FileAgentImpl file;
+    private static final Set<String> registeredNames = Collections.synchronizedSet(new HashSet<String>());
 
     /**
      * Starts the agent bootstrap.
      * @param args The command line arguments
      */
     public static void main(String[] args) {
-        System.setSecurityManager (new RMISecurityManager());
-
         progName = System.getProperty("faban.cli.command");
+
         String usage = "Usage: " + progName + " [port]";
 
         if (args.length < 2) {
             if (args.length == 1) {
-                if ("-h".equals(args[0]) || "--help".equals(args[0]) ||
-                                            "-?".equals(args[0])) {
+                if ("-h".equals(args[0]) || "--help".equals(args[0]) || "-?".equals(args[0])) {
                     System.err.println(usage);
                     System.exit(0);
-                } else {
+                }
+                else {
                     daemonPort = Integer.parseInt(args[0]);
                 }
             }
             startDaemon();
-        } else if (args.length > 3) {
+        }
+        else if (args.length > 3) {
             try {
                 startAgents(args);
-            } catch (Exception e) {
+            }
+            catch (Exception e) {
                 e.printStackTrace();
                 System.exit(-1);
             }
-        } else {
+        }
+        else {
             // We do not expose the start params for agent mode as that
             // is not supposed to be called by the user. The daemon mode
             // has only one optional param - port.
             System.err.println(usage);
             System.exit(-1);
         }
+    }
+
+    /**
+     * Return the hostname of this machine as known to this machine
+     * itself. This method is included in order to solve a Naming problem
+     * related to the names of the tpcw result files to be transferred to the
+     * the master machine.
+     * @return The hostname
+     */
+    public static String getHostName() {
+        return host;
+    }
+
+    /**
+     * Only Other Agents should access the command agent using this method.
+     * @return this Command Agent
+     */
+    public static CmdAgentImpl getHandle() {
+        return cmd;
+    }
+
+    public static Registry getRegistry()
+    {
+        return registry;
+    }
+
+    public static String getDownloadURL()
+    {
+        return downloadURL;
+    }
+
+    public static String getMaster()
+    {
+        return master;
+    }
+
+    public static String getJavaHome()
+    {
+        return javaHome;
+    }
+
+    public static List<String> getJvmOptions()
+    {
+        return Collections.unmodifiableList(jvmOptions);
+    }
+
+    public static List<String> getExtClassPath()
+    {
+        return Collections.unmodifiableList(extClassPath);
     }
 
     private static void startDaemon() {
@@ -121,21 +179,20 @@ public class AgentBootstrap {
             ServerSocket serverSocket = new ServerSocket(daemonPort);
             for (;;) {
                 Socket socket = serverSocket.accept();
-                ObjectInputStream in =
-                        new ObjectInputStream(socket.getInputStream());
+                ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
                 OutputStream out = socket.getOutputStream();
                 ArrayList<String> argList = null;
                 try {
-                    argList = (ArrayList<String>) in.readObject();
-                } catch (ClassNotFoundException e) {
+                    argList = (ArrayList<String>)in.readObject();
+                }
+                catch (ClassNotFoundException e) {
                     System.err.println("WARNING: Object class not found.");
                     e.printStackTrace();
                     continue;
                 }
                 int length = argList.size();
                 if (length > 0) {
-                    System.out.println("Agent(Daemon) starting agent with " +
-                            "options: " + argList);
+                    System.out.println("Agent(Daemon) starting agent with options: " + argList);
                     Utilities.masterPathSeparator = argList.remove(--length);
                     Utilities.masterFileSeparator = argList.remove(--length);
 
@@ -150,21 +207,25 @@ public class AgentBootstrap {
                     try {
                         startAgents(args);
                         out.write("200 OK".getBytes());
-                    } catch (Exception e) {
+                    }
+                    catch (Exception e) {
                         e.printStackTrace();
                         out.write(("500 ERROR: " + e.getMessage()).getBytes());
                     }
                 }
                 try {
                     in.close();
-                } catch (IOException e) {
+                }
+                catch (IOException e) {
                 }
                 try {
                     out.close();
-                } catch (IOException e) {
+                }
+                catch (IOException e) {
                 }
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             e.printStackTrace();  // We don't use logger here 'cause we don't
             // know the harness at this time.
             // The logger may not be configured properly.
@@ -173,9 +234,7 @@ public class AgentBootstrap {
 
     }
 
-    private static synchronized void startAgents(String[] args)
-            throws Exception {
-
+    private static synchronized void startAgents(String[] args) throws Exception {
         String hostname = args[0];
         master = args[1];
         String masterLocal = args[2];
@@ -189,64 +248,70 @@ public class AgentBootstrap {
         String escapedHome = Config.FABAN_HOME.replace("\\", "\\\\");
         String fs = File.separatorChar == '\\' ? "\\\\" : File.separator;
         jvmOptions.add("-Dfaban.home=" + escapedHome);
-        jvmOptions.add("-Djava.security.policy=" + escapedHome + "config" +
-                                                        fs + "faban.policy");
+        jvmOptions.add("-Djava.security.policy=" + escapedHome + "config" + fs + "faban.policy");
         host = InetAddress.getLocalHost().getHostName();
-        jvmOptions.add("-Djava.util.logging.config.file=" + escapedHome +
-                                        "config" + fs + "logging." + host +
-                                        ".properties");
+        jvmOptions.add("-Djava.util.logging.config.file=" + escapedHome + "config" + fs + "logging." + host + ".properties");
 
         ArrayList<String> libPath = new ArrayList<String>();
         String libPrefix = "-Djava.library.path=";
 
         // There may be optional JVM args
         boolean isClassPath = false;
-        if(args.length > 4) {
-            for(int i = 4; i < args.length; i++)
-                if(args[i].startsWith("faban.download")) {
-                    downloadURL = args[i].substring(
-                            args[i].indexOf('=') + 1);
-                }else if (args[i].startsWith("faban.benchmarkName")) {
+        if (args.length > 4) {
+            for (int i = 4; i < args.length; i++) {
+                if (args[i].startsWith("faban.download")) {
+                    downloadURL = args[i].substring(args[i].indexOf('=') + 1);
+                }
+                else if (args[i].startsWith("faban.benchmarkName")) {
                     benchName = args[i].substring(args[i].indexOf('=') + 1);
-                } else if (args[i].indexOf("faban.logging.port") != -1) {
+                }
+                else if (args[i].indexOf("faban.logging.port") != -1) {
                     jvmOptions.add(args[i]);
-                    Config.LOGGING_PORT = Integer.parseInt(
-                            args[i].substring(args[i].indexOf("=") + 1));
-                } else if (args[i].indexOf("faban.registry.port") != -1) {
+                    Config.LOGGING_PORT = Integer.parseInt(args[i].substring(args[i].indexOf("=") + 1));
+                }
+                else if (args[i].indexOf("faban.registry.port") != -1) {
                     jvmOptions.add(args[i]);
-                    Config.RMI_PORT = Integer.parseInt(
-                            args[i].substring(args[i].indexOf("=") + 1));
-                } else if (args[i].startsWith("-Dfaban.command.buffer=")) {
+                    Config.RMI_PORT = Integer.parseInt(args[i].substring(args[i].indexOf("=") + 1));
+                }
+                else if (args[i].startsWith("-Dfaban.command.buffer=")) {
                     String[] prop = args[i].substring(2).split("=");
                     System.setProperty(prop[0], prop[1]);
                     // Pass it along, too.
                     jvmOptions.add(args[i]);
-                } else if ("-server".equals(args[i]) ||
-                        "-client".equals(args[i])) { // prepend these options
+                }
+                else if ("-server".equals(args[i]) || "-client".equals(args[i])) { // prepend these options
                     jvmOptions.add(0, args[i]);
-                } else if (args[i].startsWith("-Dfaban.home=") ||
-                        args[i].startsWith("-Djava.security.policy=") ||
-                        args[i].startsWith("-Djava.util.logging.config.file=")){
+                }
+                else if (args[i].startsWith("-Dfaban.home=") ||
+                         args[i].startsWith("-Djava.security.policy=") ||
+                         args[i].startsWith("-Djava.util.logging.config.file=")) {
                     // These are sometimes passed down from the master.
                     // Ignore these. Use our local settings instead.
                     // NOOP
-                } else if ("-cp".equals(args[i])) {
+                }
+                else if ("-cp".equals(args[i])) {
                     isClassPath = true;
-                } else if ("-classpath".equals(args[i])) {
+                }
+                else if ("-classpath".equals(args[i])) {
                     isClassPath = true;
-                } else if (isClassPath) {
+                }
+                else if (isClassPath) {
                     String[] cp = pathSplit(args[i]);
-                    for (String cpElement : cp)
+                    for (String cpElement : cp) {
                         extClassPath.add(Utilities.convertPath(cpElement));
+                    }
                     isClassPath = false;
-                } else if (args[i].startsWith(libPrefix)) {
-                    String[] lp = pathSplit(
-                            args[i].substring(libPrefix.length()));
-                    for (String lpElement : lp)
+                }
+                else if (args[i].startsWith(libPrefix)) {
+                    String[] lp = pathSplit(args[i].substring(libPrefix.length()));
+                    for (String lpElement : lp) {
                         libPath.add(Utilities.convertPath(lpElement));
-                } else {
+                    }
+                }
+                else {
                     jvmOptions.add(args[i]);
                 }
+            }
         }
 
         setLogger();
@@ -259,8 +324,9 @@ public class AgentBootstrap {
             if (pathExts != null) {
                 for (String ext : pathExts) {
                     ext = ext.trim();
-                    if (ext == null || ext.length() == 0)
+                    if (ext == null || ext.length() == 0) {
                         continue;
+                    }
                     File javaPath = new File(javaBin, "java" + ext);
                     if (javaPath.exists()) {
                         java = javaPath;
@@ -280,8 +346,7 @@ public class AgentBootstrap {
         if (java == null) {
             String newJavaHome = Utilities.getJavaHome();
             if (!newJavaHome.equals(javaHome)) {
-                logger.warning("JAVA_HOME " + javaHome +
-                        " does not exist. Using " + newJavaHome + " instead.");
+                logger.warning("JAVA_HOME " + javaHome + " does not exist. Using " + newJavaHome + " instead.");
                 javaHome = newJavaHome;
             }
         }
@@ -292,7 +357,8 @@ public class AgentBootstrap {
         if (socketFactory == null) {
             socketFactory = new AgentSocketFactory(master, masterLocal);
             RMISocketFactory.setSocketFactory(socketFactory);
-        } else {
+        }
+        else {
             socketFactory.setMaster(master, masterLocal);
         }
 
@@ -305,8 +371,9 @@ public class AgentBootstrap {
         // do not want that baggage. So we make sure to crop it off.
         // i.e. brazilian.sfbay.Sun.COM should just show as brazilian.
         int dotIdx = host.indexOf('.');
-        if (dotIdx > 0)
+        if (dotIdx > 0) {
             host = host.substring(0, dotIdx);
+        }
 
         //ident will be unique
         ident = Config.CMD_AGENT + "@" + host;
@@ -319,8 +386,7 @@ public class AgentBootstrap {
             if (cmd == null) {
                 cmd = new CmdAgentImpl();
                 agentCreated = true;
-                logger.fine(hostname + "(Realname: " + host +
-                                                ") created CmdAgentImpl");
+                logger.fine(hostname + "(Realname: " + host + ") created CmdAgentImpl");
             }
 
             if (register(ident, cmd)) { // Double check for race condition
@@ -331,29 +397,32 @@ public class AgentBootstrap {
                 new Download().loadBenchmark(benchName, downloadURL);
                 cmd.setBenchName(benchName, libPath);
 
-                if(host.equals(master)) {
+                if (host.equals(master)) {
                     ident = Config.CMD_AGENT;
                     reregister(ident, cmd);
-                } else if (sameHost(host, master)) {
+                }
+                else if (sameHost(host, master)) {
                     ident = Config.CMD_AGENT;
                     reregister(ident, cmd);
                 }
 
                 // Create and reregister FileAgent
-                if (file == null)
+                if (file == null) {
                     file = new FileAgentImpl();
+                }
                 reregister(Config.FILE_AGENT + "@" + host, file);
 
                 // Register a blank Config.FILE_AGENT for the master's
                 // file agent.
-                if (sameHost(host, master))
+                if (sameHost(host, master)) {
                     reregister(Config.FILE_AGENT, file);
-            } else { // If we run into that, we just grab the agent again.
+                }
+            }
+            else { // If we run into that, we just grab the agent again.
                 if (agentCreated) {
                     UnicastRemoteObject.unexportObject(cmd, true);
                     agentCreated = false;
-                    logger.fine(hostname + "(Realname: " + host +
-                                                ") unexported CmdAgentImpl");
+                    logger.fine(hostname + "(Realname: " + host + ") unexported CmdAgentImpl");
                 }
                 agent = (CmdAgent) registry.getService(ident);
             }
@@ -367,44 +436,43 @@ public class AgentBootstrap {
             // The FileAgent registration may have a significant lag time
             // from the CmdAgent registration due to downloads, etc.
             // We just need to wait.
-            FileAgent f = (FileAgent) registry.getService(
-                                            Config.FILE_AGENT + "@" + host);
+            FileAgent f = (FileAgent)registry.getService(Config.FILE_AGENT + "@" + host);
             int retry = 0;
             while (f == null) {
                 try {
                     Thread.sleep(1000);
-                } catch (InterruptedException e) {
                 }
-                f = (FileAgent) registry.getService(
-                        Config.FILE_AGENT + "@" + host);
-                if (++retry > 100)
+                catch (InterruptedException e) {
+                }
+                f = (FileAgent)registry.getService(Config.FILE_AGENT + "@" + host);
+                if (++retry > 100) {
                     break;
+                }
             }
-            if (f != null)
+            if (f != null) {
                 reregister(Config.FILE_AGENT + "@" + hostname, f);
-            else
-                logger.severe("Giving up re-registering file agent at " + host +
-                        " as " + hostname +" after " + retry + " retries.");
+            }
+            else {
+                logger.severe("Giving up re-registering file agent at " + host + " as " + hostname +" after " + retry + " retries.");
+            }
         }
     }
 
-    private static boolean register(String name, Remote service)
-            throws RemoteException {
+    private static boolean register(String name, Remote service) throws RemoteException {
         boolean success = false;
         if (registeredNames.add(name)) {
             success = registry.register(name, service);
             if (success) {
                 logger.fine("Succeeded registering " + name);
-            } else {
-                logger.fine("Failed registering " + name +
-                                        ". Entry already exists.");
+            }
+            else {
+                logger.fine("Failed registering " + name + ". Entry already exists.");
             }
         }
         return success;
     }
 
-    private static void reregister(String name, Remote service)
-            throws RemoteException {
+    private static void reregister(String name, Remote service) throws RemoteException {
         if (registeredNames.add(name)) {
             registry.reregister(name, service);
             logger.fine("Succeeded re-registering " + name);
@@ -417,8 +485,9 @@ public class AgentBootstrap {
      */
     static void deregisterAgents() throws RemoteException {
         synchronized(registeredNames) {
-            for (String name : registeredNames)
+            for (String name : registeredNames) {
                 registry.unregister(name);
+            }
 
             registeredNames.clear();
         }
@@ -452,16 +521,18 @@ public class AgentBootstrap {
         if (pathSeparator == ':' ) {
             Pattern p = Pattern.compile("\\A[a-zA-Z]:/");
             Matcher m = p.matcher(path);
-            if (m.find())
+            if (m.find()) {
                 pathSeparator = ';';
+            }
         }
 
         // Check for ...;c:/foo/bar at any place in the path
         if (pathSeparator == ':' ) {
             Pattern p = Pattern.compile(";[a-zA-Z]:/");
             Matcher m = p.matcher(path);
-            if (m.find())
+            if (m.find()) {
                 pathSeparator = ';';
+            }
         }
 
         String delimiter = "" + pathSeparator;
@@ -473,21 +544,24 @@ public class AgentBootstrap {
         InetAddress[] host1Ip = new InetAddress[0];
         try {
             host1Ip = InetAddress.getAllByName(host1);
-        } catch (UnknownHostException e) {
+        }
+        catch (UnknownHostException e) {
             logger.severe("Host " + host1 + " not found.");
             return false;
         }
         InetAddress[] host2Ip = new InetAddress[0];
         try {
             host2Ip = InetAddress.getAllByName(host2);
-        } catch (UnknownHostException e) {
+        }
+        catch (UnknownHostException e) {
             logger.severe("Host " + host2 + " not found.");
             return false;
         }
         for (int i = 0; i < host1Ip.length; i++) {
             for (int j = 0; j < host2Ip.length; j++) {
-                if (host1Ip[i].equals(host2Ip[j]))
+                if (host1Ip[i].equals(host2Ip[j])) {
                     return true;
+                }
             }
         }
         return false;
@@ -497,25 +571,20 @@ public class AgentBootstrap {
         try {
             // Update the logging.properties file in config dir
             Properties log = new Properties();
-            FileInputStream in = new FileInputStream(Config.CONFIG_DIR +
-                                                    "logging.properties");
+            FileInputStream in = new FileInputStream(Config.CONFIG_DIR + "logging.properties");
             log.load(in);
             in.close();
 
-            logger.fine("Updating " + Config.CONFIG_DIR + "logging." +
-                    host + ".properties");
+            logger.fine("Updating " + Config.CONFIG_DIR + "logging." + host + ".properties");
             log.setProperty("java.util.logging.SocketHandler.host", master);
-            log.setProperty("java.util.logging.SocketHandler.port",
-                    String.valueOf(Config.LOGGING_PORT));
-            FileOutputStream out = new FileOutputStream(
-                    new File(Config.CONFIG_DIR + "logging." + host +
-                    ".properties"));
+            log.setProperty("java.util.logging.SocketHandler.port", String.valueOf(Config.LOGGING_PORT));
+            FileOutputStream out = new FileOutputStream(new File(Config.CONFIG_DIR + "logging." + host + ".properties"));
             log.store(out, "Faban logging properties");
             out.close();
 
-            LogManager.getLogManager().readConfiguration(new FileInputStream(
-                    Config.CONFIG_DIR + "logging." + host + ".properties"));
-        } catch (IOException e) {
+            LogManager.getLogManager().readConfiguration(new FileInputStream(Config.CONFIG_DIR + "logging." + host + ".properties"));
+        }
+        catch (IOException e) {
             e.printStackTrace();
         }
     }

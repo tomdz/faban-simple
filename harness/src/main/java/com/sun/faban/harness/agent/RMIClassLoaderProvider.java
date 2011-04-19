@@ -45,11 +45,11 @@ public class RMIClassLoaderProvider extends RMIClassLoaderSpi {
      */
     private String completeCodeBase(String codebase) {
         String[] classpath = null;
-        if (AgentBootstrap.cmd != null) {
-            if (AgentBootstrap.cmd.allClassPath != null)
-                classpath = AgentBootstrap.cmd.allClassPath;
+        if (AgentBootstrap.getHandle() != null) {
+            if (AgentBootstrap.getHandle().allClassPath != null)
+                classpath = AgentBootstrap.getHandle().allClassPath;
             else
-                classpath = AgentBootstrap.cmd.baseClassPath;
+                classpath = AgentBootstrap.getHandle().baseClassPath;
         }
         StringBuilder buffer = new StringBuilder();
         if (classpath != null) {
