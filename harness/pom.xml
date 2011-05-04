@@ -5,25 +5,25 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>org.tomdz.faban</groupId>
-    <artifactId>faban-parent</artifactId>
+    <groupId>org.tomdz.faban-simple</groupId>
+    <artifactId>faban-simple-parent</artifactId>
     <version>1.0.0-SNAPSHOT</version>
   </parent>
 
-  <groupId>org.tomdz.faban</groupId>
-  <artifactId>faban-harness</artifactId>
+  <groupId>org.tomdz.faban-simple</groupId>
+  <artifactId>faban-simple-harness</artifactId>
   <name>faban-harness</name>
   <packaging>war</packaging>
 
   <dependencies>
     <dependency>
-      <groupId>org.tomdz.faban</groupId>
-      <artifactId>faban-common</artifactId>
+      <groupId>org.tomdz.faban-simple</groupId>
+      <artifactId>faban-simple-common</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.tomdz.faban</groupId>
-      <artifactId>faban-agent</artifactId>
+      <groupId>org.tomdz.faban-simple</groupId>
+      <artifactId>faban-simple-agent</artifactId>
       <version>${project.version}</version>
     </dependency>
 

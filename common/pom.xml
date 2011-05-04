@@ -5,14 +5,14 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>org.tomdz.faban</groupId>
-    <artifactId>faban-parent</artifactId>
+    <groupId>org.tomdz.faban-simple</groupId>
+    <artifactId>faban-simple-parent</artifactId>
     <version>1.0.0-SNAPSHOT</version>
   </parent>
 
-  <groupId>org.tomdz.faban</groupId>
-  <artifactId>faban-common</artifactId>
-  <name>faban-common</name>
+  <groupId>org.tomdz.faban-simple</groupId>
+  <artifactId>faban-simple-common</artifactId>
+  <name>faban-simple-common</name>
   <packaging>jar</packaging>
 
   <dependencies>
