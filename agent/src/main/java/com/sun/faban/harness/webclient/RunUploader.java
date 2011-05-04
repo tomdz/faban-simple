@@ -58,7 +58,7 @@ import static com.sun.faban.harness.util.FileHelper.*;
  */
 public class RunUploader extends HttpServlet {
 
-    static Logger logger = Logger.getLogger(Deployer.class.getName());
+    static Logger logger = Logger.getLogger(RunUploader.class.getName());
 
     /**
      * Post method to upload the run.

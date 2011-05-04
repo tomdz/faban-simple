@@ -13,13 +13,17 @@
   <groupId>org.tomdz.faban</groupId>
   <artifactId>faban-harness</artifactId>
   <name>faban-harness</name>
-  <version>1.0.0-SNAPSHOT</version>
   <packaging>war</packaging>
 
   <dependencies>
     <dependency>
       <groupId>org.tomdz.faban</groupId>
       <artifactId>faban-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.tomdz.faban</groupId>
+      <artifactId>faban-agent</artifactId>
       <version>${project.version}</version>
     </dependency>
 

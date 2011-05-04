@@ -7,15 +7,16 @@
   <artifactId>faban-parent</artifactId>
   <packaging>pom</packaging>
   <version>1.0.0-SNAPSHOT</version>
-  <url>https://github.com/tomdz/faban</url>
+  <url>https://github.com/tomdz/faban-simple</url>
   <name>Faban fork maintained by tomdz</name>
   <properties>
-    <scm.base.url>scm:git:git://github.com/tomdz/faban.git</scm.base.url>
+    <scm.base.url>scm:git:git://github.com/tomdz/faban-simple.git</scm.base.url>
   </properties>
 
   <modules>
     <module>common</module>
     <module>driver</module>
+    <module>agent</module>
     <module>harness</module>
   </modules>
 
