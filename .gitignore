@@ -1,5 +1,4 @@
-common/build
-driver/build
-driver/lib/fabancommon.jar
-harness/build
-harness/lib/fabancommon.jar
+.project
+.classpath
+.settings
+jetty*
