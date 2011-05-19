@@ -174,7 +174,7 @@ public class TimeThread extends AgentThread {
             }
             catch (InvocationTargetException e) {
                 if (id == 0) {
-                    logger.finest(String.format("Returned from %d (Err) at %d", op.getName(), System.nanoTime()));
+                    logger.finest(String.format("Returned from %s (Err) at %d", op.getName(), System.nanoTime()));
                 }
                 // An invocation target exception is caused by another
                 // exception thrown by the operation directly.
