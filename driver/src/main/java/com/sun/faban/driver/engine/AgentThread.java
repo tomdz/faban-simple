@@ -104,6 +104,8 @@ public abstract class AgentThread extends Thread {
     Class<?> driverClass;
     Object driver;
     boolean inRamp = true; // indicator for rampup or rampdown, initially true
+    boolean runPre;
+    boolean runPost;
     long[] delayTime;  // recently calculated cycle times
     long[] startTime; // start times for previous tx
     long[] endTime; // end time for the recent tx ended
@@ -342,8 +344,7 @@ public abstract class AgentThread extends Thread {
      * Executes the method market with @OnceBefore in thread 0.
      */
     void preRun() {
-        // Thread 0 needs to do the preRun
-        if (id == 0 && driverConfig.preRun != null) {
+        if (runPre) {
             setThreadState(RunState.PRE_RUN);
             logger.fine(name + ": Invoking preRun @OnceBefore");
             try {
@@ -376,7 +377,7 @@ public abstract class AgentThread extends Thread {
      * Executes the method marked with @OnceAfter in thread 0.
      */
     void postRun() {
-        if (id == 0 && driverConfig.postRun != null && compareAndSetThreadState(RunState.RUNNING, RunState.POST_RUN)) {
+        if (runPost && compareAndSetThreadState(RunState.RUNNING, RunState.POST_RUN)) {
             // Tell the world we're finished.
             agent.finishLatch.countDown();
             logger.finest(name + ": Thread 0 finished, awaiting postRunLatch");

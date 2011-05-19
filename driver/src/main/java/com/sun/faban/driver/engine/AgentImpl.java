@@ -163,15 +163,13 @@ public class AgentImpl extends UnicastRemoteObject
 
         threadStartLatch = new CountDownLatch(runInfo.agentInfo.threads);
         timeSetLatch = new CountDownLatch(1);
-        if (runInfo.agentInfo.startThreadNumber == 0) { // first agent
-            if (runInfo.driverConfig.preRun != null) {
-				preRunLatch = new CountDownLatch(1);
-                startLatch = new CountDownLatch(1);
-			}
-            if (runInfo.driverConfig.postRun != null) {
-                finishLatch = new CountDownLatch(1);
-				postRunLatch = new CountDownLatch(1);
-			}
+        if (runInfo.shouldRunPre()) {
+            preRunLatch = new CountDownLatch(1);
+            startLatch = new CountDownLatch(1);
+        }
+        if (runInfo.shouldRunPost()) {
+            finishLatch = new CountDownLatch(1);
+			postRunLatch = new CountDownLatch(1);
         }
         try {
             runInfo.postDeserialize();
@@ -250,12 +248,13 @@ public class AgentImpl extends UnicastRemoteObject
         numThreads = runInfo.agentInfo.threads;
         agentThreads = new AgentThread[numThreads];
         try {
-            if (runInfo.agentInfo.startThreadNumber == 0 &&
-                    runInfo.driverConfig.preRun != null) {
-                agentThreads[0] = AgentThread.getInstance(agentType, agentId,
-                        0, runInfo.driverConfig.driverClass, timer,
-                        this);
+            boolean shouldRun = runInfo.shouldRunPre();
+
+            if (shouldRun) {
+                agentThreads[0] = AgentThread.getInstance(agentType, agentId, runInfo.agentInfo.startThreadNumber, runInfo.driverConfig.driverClass, timer, this);
                 agentThreads[0].start();
+                agentThreads[0].runPre = true;
+                agentThreads[0].runPost = runInfo.shouldRunPost();
                 preRunLatch.await();
                 preRunLatch = null;
 
@@ -295,8 +294,7 @@ public class AgentImpl extends UnicastRemoteObject
             int count = 0;
 
             // First thread already started if preRun is there
-            if (runInfo.agentInfo.startThreadNumber == 0 &&
-                    runInfo.driverConfig.preRun != null) {
+            if (agentThreads[0] != null) {
                 // First thread already started, just let it run.
                 startLatch.countDown();
                 if (System.nanoTime() < earliestStartTime)
@@ -307,11 +305,9 @@ public class AgentImpl extends UnicastRemoteObject
             calibrateTime();
 
             for (; count < numThreads && !runAborted; count++) {
-                int globalThreadId = runInfo.agentInfo.startThreadNumber +
-                        count;
-                agentThreads[count] = AgentThread.getInstance(agentType,
-                        agentId, globalThreadId,
-                        runInfo.driverConfig.driverClass, timer, this);
+                int globalThreadId = runInfo.agentInfo.startThreadNumber + count;
+                agentThreads[count] = AgentThread.getInstance(agentType, agentId, globalThreadId, runInfo.driverConfig.driverClass, timer, this);
+                agentThreads[count].runPost = (count == 0 && runInfo.shouldRunPost());
                 agentThreads[count].start();
 
                 // We ensure we catch up with the configured thread starting
@@ -606,9 +602,7 @@ public class AgentImpl extends UnicastRemoteObject
      * postRun is configured.
      */
     public void postRun() {
-        if (runInfo.agentInfo.startThreadNumber == 0 &&
-                runInfo.driverConfig.postRun != null &&
-                agentThreads[0] != null) {// first agent, postRun
+        if (agentThreads[0] != null && agentThreads[0].runPost) {
             logger.finest(agentType + "Releasing postRun latch.");
             postRunLatch.countDown();
             try {

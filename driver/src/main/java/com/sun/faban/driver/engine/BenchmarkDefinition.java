@@ -513,21 +513,26 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
             throws DefinitionException {
         Method[] methods = driverClass.getMethods();
         for (Method m : methods) {
-			if (m.isAnnotationPresent(OnceBefore.class)) {
+            OnceBefore onceBefore = m.getAnnotation(OnceBefore.class);
+            OnceAfter onceAfter = m.getAnnotation(OnceAfter.class);
+
+            if (onceBefore != null) {
                 if (driver.preRun == null) {
                     driver.preRun = new DriverMethod();
                     driver.preRun.m = m;
                     driver.preRun.genericName = m.toGenericString();
+                    driver.preRun.perAgent = onceBefore.perAgent();
                 }
                 else {
                     throw new DefinitionException("Found more than one @OnceBefore method, %s and %s.", driver.preRun.genericName, m.toGenericString());
                 }
             }
-			else if (m.isAnnotationPresent(OnceAfter.class)) {
+			else if (onceAfter != null) {
                 if (driver.postRun == null) {
                     driver.postRun = new DriverMethod();
                     driver.postRun.m = m;
                     driver.postRun.genericName = m.toGenericString();
+                    driver.postRun.perAgent = onceAfter.perAgent();
                 }
                 else {
                     throw new DefinitionException("Found more than one @OnceAfter method, %s and %s.", driver.postRun.genericName, m.toGenericString());
@@ -812,6 +817,7 @@ public class BenchmarkDefinition implements Serializable, Cloneable {
 		private static final long serialVersionUID = 1L;
 
 		String genericName;
+		boolean perAgent;
         transient Method m;
 
         /**

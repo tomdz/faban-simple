@@ -170,6 +170,30 @@ public class RunInfo implements Serializable {
         return instance;
     }
 
+    public boolean shouldRunPre() {
+        if (driverConfig.preRun != null) {
+            if (driverConfig.preRun.perAgent) {
+                return true;
+            }
+            else if (!driverConfig.preRun.perAgent && agentInfo.startThreadNumber == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean shouldRunPost() {
+        if (driverConfig.postRun != null) {
+            if (driverConfig.postRun.perAgent) {
+                return true;
+            }
+            else if (!driverConfig.postRun.perAgent && agentInfo.startThreadNumber == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * The method postDeserialize re-establishes the non-serializable fields.
      * @throws ClassNotFoundException
